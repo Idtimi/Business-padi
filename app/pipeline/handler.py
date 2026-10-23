@@ -1,4 +1,5 @@
 import logging
+import shutil
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -8,6 +9,8 @@ from app.config import settings
 from app.i18n import t
 from app.models import Business, ProcessedMessage, User, WaMessageLog
 from app.pipeline import router
+from app.pipeline.asr import ASRClient, get_asr
+from app.pipeline.audio import AudioConversionError, AudioTooLong, download_and_convert
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +40,30 @@ def resolve_identity(session: Session, msg: IncomingMessage) -> tuple[User, Busi
     return user, biz
 
 
+async def _handle_voice(channel: Channel, session: Session, biz, user, msg,
+                        asr: ASRClient | None = None) -> list[router.Reply]:
+    """Download voice note -> convert to WAV -> ASR -> route as text."""
+    asr = asr or get_asr()
+    tmp_dir = None
+    try:
+        wav_path, tmp_dir = await download_and_convert(channel, msg.media_ref)
+        transcript = asr.transcribe(wav_path, user.language, [])
+        log.info("ASR transcript for %s: %r", mask(msg.user_ref), transcript.text[:120])
+        if not transcript.text.strip():
+            return [router.Reply(t(user.language, "try_again"))]
+        return router.handle_text(session, biz.id, user.id, transcript.text,
+                                  msg.message_id, user.language, channel=msg.channel)
+    except AudioTooLong:
+        max_s = settings.max_voice_seconds
+        return [router.Reply(f"Voice note too long. Please keep it under {max_s} seconds.")]
+    except AudioConversionError:
+        log.exception("audio conversion failed for message %s", msg.message_id)
+        return [router.Reply(t(user.language, "try_again"))]
+    finally:
+        if tmp_dir is not None:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 def _non_text_replies(session, biz, user, msg) -> list[router.Reply]:
     if msg.kind == "button":
         try:
@@ -44,8 +71,6 @@ def _non_text_replies(session, biz, user, msg) -> list[router.Reply]:
         except ValueError:
             return [router.Reply(t(user.language, "try_again"))]
         return router.handle_button(session, biz.id, user.id, action, pid, user.language)
-    if msg.kind == "voice":  # TEMPORARY until the next chunk
-        return [router.Reply("Voice notes are coming soon. Please type for now.")]
     return [router.Reply("I can only read text and voice notes for now.")]
 
 
@@ -62,7 +87,8 @@ async def _send_all(channel: Channel, session: Session, biz, to_ref, replies):
     session.commit()
 
 
-async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Session) -> None:
+async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Session,
+                          asr: ASRClient | None = None) -> None:
     user, biz = resolve_identity(session, msg)
     user.last_user_message_at = msg.timestamp.isoformat()
     session.commit()
@@ -71,6 +97,12 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         # router.handle_text ignores repeats of the same message id by itself
         replies = router.handle_text(session, biz.id, user.id, msg.text or "",
                                      msg.message_id, user.language, channel=msg.channel)
+    elif msg.kind == "voice":
+        if session.get(ProcessedMessage, (msg.channel, msg.message_id)) is not None:
+            return
+        # _handle_voice calls router.handle_text which inserts its own
+        # ProcessedMessage, so we do NOT insert one here.
+        replies = await _handle_voice(channel, session, biz, user, msg, asr=asr)
     else:
         if session.get(ProcessedMessage, (msg.channel, msg.message_id)) is not None:
             return
