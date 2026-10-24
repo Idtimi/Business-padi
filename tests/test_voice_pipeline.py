@@ -49,6 +49,16 @@ def voice_msg(mid="v1", media_ref="MEDIA1", user_ref="2348012345678"):
     )
 
 
+def seed_onboarded_user(factory, user_ref="2348012345678"):
+    with factory() as s:
+        u = m.User(channel="whatsapp", channel_user_id=user_ref, language="en",
+                   state="DONE", consent_at=m.now_iso())
+        s.add(u)
+        s.flush()
+        s.add(m.Business(owner_user_id=u.id, name="Shop"))
+        s.commit()
+
+
 class FakeChannel:
     """Channel that returns canned audio bytes and records sent messages."""
 
@@ -131,6 +141,7 @@ def _fake_download_factory(transcript_text: str = RICE, call_counter: list | Non
 def test_voice_note_transcribed_and_routed(factory, monkeypatch):
     """Voice note -> download -> ASR(RICE) -> confirm card with N127,500."""
     monkeypatch.setattr(handler_mod, "download_and_convert", _fake_download_factory(RICE))
+    seed_onboarded_user(factory)
 
     channel = FakeChannel()
     asr = SidecarASR()
@@ -166,6 +177,7 @@ def test_voice_duplicate_is_ignored(factory, monkeypatch):
     counter: list = []
     monkeypatch.setattr(handler_mod, "download_and_convert",
                         _fake_download_factory(RICE, call_counter=counter))
+    seed_onboarded_user(factory)
 
     channel = FakeChannel()
     asr = SidecarASR()
@@ -185,6 +197,7 @@ def test_empty_transcript_returns_error(factory, monkeypatch):
     """When ASR returns empty text, send a try_again message."""
     monkeypatch.setattr(handler_mod, "download_and_convert",
                         _fake_download_factory(""))
+    seed_onboarded_user(factory)
 
     channel = FakeChannel()
     asr = SidecarASR(fixed_text="")  # empty transcript

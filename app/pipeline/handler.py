@@ -11,6 +11,7 @@ from app.models import Business, ProcessedMessage, User, WaMessageLog
 from app.pipeline import router
 from app.pipeline.asr import ASRClient, get_asr
 from app.pipeline.audio import AudioConversionError, AudioTooLong, download_and_convert
+from app.services import onboarding
 
 log = logging.getLogger(__name__)
 
@@ -24,23 +25,21 @@ def message_cost_kobo() -> int:
     return round(settings.wa_usd_per_message * settings.usd_ngn * 100)
 
 
-def resolve_identity(session: Session, msg: IncomingMessage) -> tuple[User, Business]:
-    """TEMPORARY: auto-creates a user and shop on first message.
-    Phase 4 replaces this with real onboarding (consent, shop name, logo)."""
+def resolve_identity(session: Session, msg: IncomingMessage) -> tuple[User, Business | None]:
+    """Resolve user and their business. If user doesn't exist, create in NEW state."""
     user = session.scalar(select(User).where(
         User.channel == msg.channel, User.channel_user_id == msg.user_ref))
     if user is None:
         user = User(channel=msg.channel, channel_user_id=msg.user_ref,
-                    language=settings.default_language)
+                    language=settings.default_language, state="NEW")
         session.add(user)
         session.flush()
-        session.add(Business(owner_user_id=user.id, name="My Shop"))
-        session.flush()
+
     biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
     return user, biz
 
 
-async def _handle_voice(channel: Channel, session: Session, biz, user, msg,
+async def _handle_voice(channel: Channel, session: Session, biz: Business | None, user: User, msg: IncomingMessage,
                         asr: ASRClient | None = None) -> list[router.Reply]:
     """Download voice note -> convert to WAV -> ASR -> route as text."""
     asr = asr or get_asr()
@@ -51,6 +50,15 @@ async def _handle_voice(channel: Channel, session: Session, biz, user, msg,
         log.info("ASR transcript for %s: %r", mask(msg.user_ref), transcript.text[:120])
         if not transcript.text.strip():
             return [router.Reply(t(user.language, "try_again"))]
+
+        # If user is in onboarding, feed transcribed text to onboarding
+        if user.state != "DONE":
+            msg.text = transcript.text
+            return await onboarding.handle_onboarding(channel, msg, user, session)
+
+        if biz is None:
+            return [router.Reply("Please complete shop setup first.")]
+
         return router.handle_text(session, biz.id, user.id, transcript.text,
                                   msg.message_id, user.language, channel=msg.channel)
     except AudioTooLong:
@@ -64,24 +72,26 @@ async def _handle_voice(channel: Channel, session: Session, biz, user, msg,
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _non_text_replies(session, biz, user, msg) -> list[router.Reply]:
+def _non_text_replies(session: Session, biz: Business | None, user: User, msg: IncomingMessage) -> list[router.Reply]:
     if msg.kind == "button":
         try:
             action, pid = router.parse_button(msg.button_id or "")
         except ValueError:
             return [router.Reply(t(user.language, "try_again"))]
+        if biz is None:
+            return [router.Reply("Please complete shop setup first.")]
         return router.handle_button(session, biz.id, user.id, action, pid, user.language)
     return [router.Reply("I can only read text and voice notes for now.")]
 
 
-async def _send_all(channel: Channel, session: Session, biz, to_ref, replies):
+async def _send_all(channel: Channel, session: Session, biz: Business | None, to_ref: str, replies: list[router.Reply]):
     for r in replies:
         if r.buttons:
             await channel.send_buttons(to_ref, r.text, r.buttons)
         else:
             await channel.send_text(to_ref, r.text)
         session.add(WaMessageLog(
-            business_id=biz.id, to_ref=mask(to_ref), category="service",
+            business_id=biz.id if biz else None, to_ref=mask(to_ref), category="service",
             msg_type="interactive" if r.buttons else "text",
             status="sent", est_cost_kobo=message_cost_kobo()))
     session.commit()
@@ -93,19 +103,46 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
     user.last_user_message_at = msg.timestamp.isoformat()
     session.commit()
 
+    # Deduplication check up front
+    if session.get(ProcessedMessage, (msg.channel, msg.message_id)) is not None:
+        return
+
+    # 1. State machine: if user has not completed onboarding, route to onboarding
+    if user.state != "DONE":
+        if msg.kind == "voice":
+            replies = await _handle_voice(channel, session, biz, user, msg, asr=asr)
+        else:
+            replies = await onboarding.handle_onboarding(channel, msg, user, session)
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        # Refresh biz if created during onboarding
+        biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
+        await _send_all(channel, session, biz, msg.user_ref, replies)
+        return
+
+    # 2. Onboarded users: check for settings and help commands
+    text = (msg.text or "").strip()
+    if msg.kind == "text" and text.lower().startswith("/settings"):
+        replies = [onboarding.handle_settings_command(session, user, biz, text, user.language)]
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        await _send_all(channel, session, biz, msg.user_ref, replies)
+        return
+
+    if msg.kind == "text" and text.lower() == "help":
+        replies = [router.Reply(onboarding.help_menu(user.language))]
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        await _send_all(channel, session, biz, msg.user_ref, replies)
+        return
+
+    # 3. Regular transaction and query flow
     if msg.kind == "text":
-        # router.handle_text ignores repeats of the same message id by itself
-        replies = router.handle_text(session, biz.id, user.id, msg.text or "",
+        replies = router.handle_text(session, biz.id, user.id, text,
                                      msg.message_id, user.language, channel=msg.channel)
     elif msg.kind == "voice":
-        if session.get(ProcessedMessage, (msg.channel, msg.message_id)) is not None:
-            return
-        # _handle_voice calls router.handle_text which inserts its own
-        # ProcessedMessage, so we do NOT insert one here.
         replies = await _handle_voice(channel, session, biz, user, msg, asr=asr)
     else:
-        if session.get(ProcessedMessage, (msg.channel, msg.message_id)) is not None:
-            return
         replies = _non_text_replies(session, biz, user, msg)
         session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
         session.commit()

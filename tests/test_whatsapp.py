@@ -76,6 +76,16 @@ def count(factory, model):
         return s.scalar(select(func.count()).select_from(model))
 
 
+def seed_onboarded_user(factory, sender=SENDER):
+    with factory() as s:
+        u = m.User(channel="whatsapp", channel_user_id=sender, language="en",
+                   state="DONE", consent_at=m.now_iso())
+        s.add(u)
+        s.flush()
+        s.add(m.Business(owner_user_id=u.id, name="Shop"))
+        s.commit()
+
+
 def test_signature_valid():
     raw = b'{"a":1}'
     assert verify_signature(raw, sign(raw), SECRET)
@@ -128,6 +138,7 @@ def test_forged_request_is_rejected(wa):
 
 def test_text_then_save_flow(wa):
     client, channel, factory = wa
+    seed_onboarded_user(factory)
     assert post(client, payload(text_msg("w1", RICE))).status_code == 200
     assert len(channel.sent) == 1
     first = channel.sent[0]
@@ -144,6 +155,7 @@ def test_text_then_save_flow(wa):
 
 def test_duplicate_delivery_is_ignored(wa):
     client, channel, factory = wa
+    seed_onboarded_user(factory)
     post(client, payload(text_msg("w1", RICE)))
     post(client, payload(text_msg("w1", RICE)))  # Meta sometimes delivers twice
     assert len(channel.sent) == 1
