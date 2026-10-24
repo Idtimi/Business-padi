@@ -3,4 +3,5 @@ __pycache__/
 .env
 *.db
 data/
+media/
 .pytest_cache/

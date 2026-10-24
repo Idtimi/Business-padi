@@ -5,12 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.i18n import t
-from app.models import Customer, PendingAction, ProcessedMessage
+from app.models import Business, Customer, PendingAction, ProcessedMessage, Transaction
 from app.money import fmt_naira
 from app.pipeline.extract import ExtractionFailed, extract
 from app.pipeline.llm import LLMClient, get_llm
 from app.pipeline.validate import Validated, validate
-from app.services import ledger, pending, reports
+from app.services import documents, ledger, pending, reports
 
 
 @dataclass
@@ -52,7 +52,7 @@ def confirmation_text(lang: str, v: Validated) -> str:
         out.append(f"{t(lang, 'customer')}: {v.customer}")
     if v.supplier:
         out.append(f"{t(lang, 'supplier')}: {v.supplier}")
-    if v.intent == "sale":
+    if v.intent in {"sale", "invoice"}:
         money = f"{t(lang, 'paid')}: {fmt_naira(v.paid_kobo)}"
         if v.balance_kobo > 0:
             money += f"   {t(lang, 'owes')}: {fmt_naira(v.balance_kobo)}"
@@ -114,6 +114,43 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
             except ValueError as e:
                 replies.append(Reply(str(e), kind="info"))
             continue
+        if v.intent in {"receipt", "invoice"}:
+            cust = ledger.get_or_create_customer(session, business_id, v.customer)
+            tx = None
+            if not v.lines and v.total_kobo <= 0:
+                tx = ledger.get_last_transaction(session, business_id)
+                if tx is None:
+                    replies.append(Reply("No recent sale found to create document."))
+                    continue
+                cust_id = tx.customer_id
+                items = tx.items_json or []
+                tot_kobo = tx.total_kobo
+                paid_kobo = tx.paid_kobo
+            else:
+                cust_id = cust.id if cust else None
+                items = [
+                    {"name": l.name, "qty": l.qty, "unit": l.unit, "unit_price_kobo": l.unit_price_kobo, "line_total_kobo": l.line_total_kobo}
+                    for l in v.lines
+                ]
+                tot_kobo = v.total_kobo
+                paid_kobo = v.paid_kobo
+
+            cust_name = session.get(Customer, cust_id).name if cust_id else (v.customer or "Customer")
+            preview = f"Issue {v.intent.title()} for {cust_name}: {fmt_naira(tot_kobo)}"
+            payload = {
+                "kind": v.intent,
+                "customer_id": cust_id,
+                "items": items,
+                "total_kobo": tot_kobo,
+                "paid_kobo": paid_kobo,
+                "transaction_id": tx.id if tx else None,
+                "due_date": v.due_date,
+            }
+            p = pending.create(session, business_id, user_id, f"issue_{v.intent}", payload)
+            session.commit()
+            buttons = [(f"issue:{p.id}", "Issue"), (f"cancel:{p.id}", t(lang, "cancel"))]
+            replies.append(Reply(preview, buttons=buttons, kind="confirm", pending_id=p.id))
+            continue
         if v.intent not in ledger.SAVEABLE:
             replies.append(Reply(t(lang, "not_yet")))
             continue
@@ -163,7 +200,30 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
                   pending_id: int, lang: str = "en") -> list[Reply]:
     try:
         p = pending.get_for_business(session, business_id, pending_id)
-        if action == "save":
+        if action in {"save", "issue"}:
+            if p.kind.startswith("issue_"):
+                data = p.payload
+                doc = documents.issue_document(
+                    session=session,
+                    business_id=business_id,
+                    kind=data["kind"],
+                    transaction_id=data.get("transaction_id"),
+                    customer_id=data.get("customer_id"),
+                    items=data.get("items"),
+                    total_kobo=data["total_kobo"],
+                    paid_kobo=data["paid_kobo"],
+                    due_date=data.get("due_date"),
+                )
+                p.status = "applied"
+                session.commit()
+                cust = session.get(Customer, data.get("customer_id")) if data.get("customer_id") else None
+                biz = session.get(Business, business_id)
+                link = documents.wa_me_link(
+                    cust.phone if cust else None,
+                    f"Here is your {doc.kind} #{doc.number} from {biz.name if biz else 'Shop'}: {fmt_naira(doc.total_kobo)}"
+                )
+                msg_text = f"{doc.kind.title()} #{doc.number} issued ({fmt_naira(doc.total_kobo)}).\nForward link: {link}"
+                return [Reply(msg_text)]
             if p.kind == "correction":
                 tx = ledger.confirm_correction(session, business_id, pending_id)
                 return [Reply(_saved_text(session, business_id, tx, lang))]

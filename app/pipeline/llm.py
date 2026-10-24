@@ -34,6 +34,13 @@ class MockLLM:
                     "query": {"type": "top_debtor", "params": {}},
                 }],
             }
+        if "send receipt" in user_norm or "receipt for that sale" in user_norm:
+            return {
+                "language_detected": "english",
+                "transactions": [{
+                    "intent": "receipt",
+                }],
+            }
         return {
             "language_detected": "unknown",
             "transactions": [{

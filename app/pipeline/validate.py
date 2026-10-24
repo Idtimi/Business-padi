@@ -72,8 +72,12 @@ def validate(x: Extracted) -> Validated:
         v.problems.append(x.needs_clarification)
         return v
 
-    # Pass through query and correction intents without demanding line items or amounts
+    # Pass through query, correction, chitchat without demanding line items
     if x.intent in {"query", "correction", "chitchat", "unknown"}:
+        return v
+
+    # If receipt or invoice without items/amount, it refers to the last transaction
+    if x.intent in {"receipt", "invoice"} and not x.items and x.amount is None:
         return v
 
     # Total: sum of lines, or the single amount if there are no items
@@ -89,8 +93,8 @@ def validate(x: Extracted) -> Validated:
         v.total_kobo = to_kobo(x.amount)
 
     # Reject zero, negative or absurd amounts
-    needs_amount = x.intent in {"sale", "expense", "payment_received", "restock"}
-    if needs_amount and v.total_kobo <= 0:
+    needs_amount = x.intent in {"sale", "expense", "payment_received", "restock", "invoice", "receipt"}
+    if needs_amount and v.total_kobo <= 0 and (x.items or x.amount is not None):
         v.problems.append("I no see the amount. How much be am?")
         return v
     if v.total_kobo > MAX_AMOUNT_KOBO:
@@ -98,7 +102,7 @@ def validate(x: Extracted) -> Validated:
         return v
 
     # Amount paid: cash = all, credit = none, partial = what was said
-    if x.intent == "sale":
+    if x.intent in {"sale", "invoice"}:
         if x.payment == "cash":
             v.paid_kobo = v.total_kobo
         elif x.payment == "partial":
@@ -108,8 +112,8 @@ def validate(x: Extracted) -> Validated:
         elif x.payment == "credit":
             v.paid_kobo = 0
         else:
-            v.problems.append("Dem pay cash, or na credit?")
-    elif x.intent in {"expense", "restock", "payment_received"}:
+            v.paid_kobo = 0 if x.intent == "invoice" else 0
+    elif x.intent in {"expense", "restock", "payment_received", "receipt"}:
         v.paid_kobo = v.total_kobo
 
     return v

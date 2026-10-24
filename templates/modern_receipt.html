@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 20mm; }
+  body { font-family: 'DejaVu Sans', Arial, sans-serif; color: #2d3748; background: #fff; margin: 0; }
+  .card { border-radius: 8px; border: 1px solid #e2e8f0; padding: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+  .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid {{ brand_color or '#3182ce' }}; padding-bottom: 20px; }
+  .biz-title { font-size: 26px; font-weight: 800; color: {{ brand_color or '#3182ce' }}; }
+  .badge { background: {{ brand_color or '#3182ce' }}; color: #fff; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 13px; text-transform: uppercase; display: inline-block; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; margin: 25px 0; gap: 20px; font-size: 13px; }
+  .table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 25px 0; border-radius: 6px; overflow: hidden; border: 1px solid #edf2f7; }
+  .table th { background: #f7fafc; padding: 12px; font-weight: 600; text-align: left; font-size: 12px; color: #718096; text-transform: uppercase; }
+  .table td { padding: 12px; border-top: 1px solid #edf2f7; font-size: 13px; }
+  .num { text-align: right; }
+  .summary { width: 350px; margin-left: auto; margin-top: 15px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+  .summary-row.total { font-size: 18px; font-weight: 700; color: {{ brand_color or '#3182ce' }}; border-top: 2px solid #e2e8f0; padding-top: 12px; }
+  .footer { margin-top: 40px; text-align: center; color: #a0aec0; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top">
+    <div>
+      <div class="biz-title">{{ business.name or 'Business' }}</div>
+      <div style="font-size: 12px; color: #718096;">{{ business.address or '' }} &bull; {{ business.phone or '' }}</div>
+    </div>
+    <div style="text-align: right;">
+      <span class="badge">{{ doc_kind or 'Receipt' }}</span>
+      <div style="font-size: 12px; margin-top: 5px;">#{{ doc_number }}</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div>
+      <strong style="color: #718096; text-transform: uppercase; font-size: 11px;">Customer</strong>
+      <div style="font-size: 15px; font-weight: 600;">{{ customer.name if customer else 'Valued Customer' }}</div>
+      <div>{{ customer.phone or '' }}</div>
+    </div>
+    <div style="text-align: right;">
+      <strong style="color: #718096; text-transform: uppercase; font-size: 11px;">Date</strong>
+      <div style="font-size: 14px;">{{ doc_date }}</div>
+    </div>
+  </div>
+
+  <table class="table">
+    <thead>
+      <tr><th>Item</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Total</th></tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td><strong>{{ item.name or 'Item' }}</strong></td>
+        <td class="num">{{ item.qty or 1 }} {{ item.unit or '' }}</td>
+        <td class="num">{{ item.unit_price_formatted or '-' }}</td>
+        <td class="num"><strong>{{ item.total_formatted }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="summary">
+    <div class="summary-row"><span>Total:</span><span>{{ total_formatted }}</span></div>
+    <div class="summary-row"><span>Amount Paid:</span><span>{{ paid_formatted }}</span></div>
+    <div class="summary-row total"><span>Balance Due:</span><span>{{ balance_formatted }}</span></div>
+  </div>
+
+  <div class="footer">
+    {{ business.footer_note or 'We appreciate your business.' }}
+  </div>
+</div>
+</body>
+</html>

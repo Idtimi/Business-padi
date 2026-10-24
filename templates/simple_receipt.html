@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 15mm; }
+  body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 12px; color: #111; margin: 0; }
+  .header { display: flex; justify-content: space-between; border-bottom: 1px solid #111; padding-bottom: 10px; margin-bottom: 15px; }
+  .biz-name { font-size: 18px; font-weight: bold; }
+  .items { width: 100%; border-collapse: collapse; margin: 15px 0; }
+  .items th, .items td { border: 1px solid #111; padding: 6px; }
+  .items th { background: #eee; text-align: left; }
+  .num { text-align: right; }
+  .totals { width: 45%; float: right; }
+  .totals table { width: 100%; }
+  .totals td { padding: 4px; text-align: right; }
+  .footer { clear: both; margin-top: 30px; font-size: 10px; color: #555; text-align: center; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="biz-name">{{ business.name or 'Receipt' }}</div>
+    <div>{{ business.address or '' }} {{ business.phone or '' }}</div>
+  </div>
+  <div style="text-align: right;">
+    <strong>{{ doc_number }}</strong><br>
+    Date: {{ doc_date }}
+  </div>
+</div>
+
+<div><strong>Customer:</strong> {{ customer.name if customer else 'Customer' }}</div>
+
+<table class="items">
+  <thead>
+    <tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td>{{ item.name or 'Item' }}</td>
+      <td class="num">{{ item.qty or 1 }} {{ item.unit or '' }}</td>
+      <td class="num">{{ item.unit_price_formatted or '-' }}</td>
+      <td class="num">{{ item.total_formatted }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="totals">
+  <table>
+    <tr><td>Total:</td><td><strong>{{ total_formatted }}</strong></td></tr>
+    <tr><td>Paid:</td><td>{{ paid_formatted }}</td></tr>
+    <tr><td>Balance:</td><td><strong>{{ balance_formatted }}</strong></td></tr>
+  </table>
+</div>
+
+<div class="footer">
+  {{ business.footer_note or 'Thank you for your patronage.' }}
+</div>
+</body>
+</html>
