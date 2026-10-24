@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ profile.business_name }} - Verified Financial Trade Profile</title>
+    <style>
+        :root {
+            --primary: #0b8457;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --warning: #d97706;
+            --success: #16a34a;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); line-height: 1.5; padding: 2rem 1rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .brand-badge { background: #dcfce7; color: #166534; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 9999px; text-transform: uppercase; }
+        .notice-banner { background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+        .stat-title { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+        .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-top: 0.25rem; }
+        .stat-desc { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .btn { display: inline-flex; align-items: center; padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600; border-radius: 6px; text-decoration: none; cursor: pointer; border: none; background: var(--primary); color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
+        th { background: #f8fafc; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); text-align: left; }
+        td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+        .footer { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="notice-banner">
+            🛡️ <strong>Verified Trade Profile</strong> &bull; Authorized by merchant via explicit consent for partner <strong>{{ consent.partner }}</strong>.
+            This document represents verified bookkeeping history and is <strong>not a credit score</strong>.
+        </div>
+
+        <div class="header">
+            <div>
+                <span class="brand-badge">Voice Ledger Verified</span>
+                <h1 style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ profile.business_name }}</h1>
+                <p style="color: var(--text-muted); font-size: 0.85rem;">As of {{ profile.as_of_date }} &bull; Scope: {{ consent.scope }}</p>
+            </div>
+            <div>
+                <a href="/profile/shared/{{ token }}/pdf" class="btn">📄 Download PDF Profile</a>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Record Maturity</div>
+                <div class="stat-value" style="color: var(--primary);">{{ profile.record_maturity.weeks }} Weeks</div>
+                <div class="stat-desc">{{ profile.record_maturity.days }} days of active trade history</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Active-Days Ratio</div>
+                <div class="stat-value">{{ profile.active_days_ratio.percentage }}%</div>
+                <div class="stat-desc">{{ profile.active_days_ratio.active_days }} of {{ profile.active_days_ratio.total_days }} days active</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Credit Collection Rate</div>
+                <div class="stat-value" style="color: var(--success);">{{ profile.collection_rate.percentage }}%</div>
+                <div class="stat-desc">Credit collected on schedule</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Avg Days to Collect</div>
+                <div class="stat-value">{{ profile.average_days_to_collect.days }} Days</div>
+                <div class="stat-desc">Average payment turnaround</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Total Outstanding Debt</div>
+                <div class="stat-value" style="color: var(--warning);">{{ profile.debt_concentration.total_debt_naira }}</div>
+                <div class="stat-desc">Across {{ profile.debt_concentration.debtor_count }} debtors</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Debt Concentration</div>
+                <div class="stat-value">{{ profile.debt_concentration.top_3_share_pct }}%</div>
+                <div class="stat-desc">Share held by top 3 debtors</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 0.5rem;">Monthly Turnover Trend</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Sales Volume</th>
+                        <th>Transaction Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in profile.monthly_sales_trend.months %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ m.month }}</td>
+                        <td>{{ m.sales_naira }}</td>
+                        <td>{{ m.count }} sales</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            CONFIDENTIAL &bull; Powered by Voice Ledger Platform &bull; Aggregated Metrics Only &bull; Zero Individual Customer Data Exposed
+        </div>
+    </div>
+</body>
+</html>

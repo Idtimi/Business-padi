@@ -275,6 +275,33 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return [Reply(f"Here is your secure link to access the shop dashboard:\n{link_url}\n\nThis link expires in 15 minutes.")]
 
+    # Financial trade profile command
+    if lower in ("/profile", "profile", "/trade_profile", "trade profile") and biz:
+        from app.services import profile
+        if not profile.can_access_profile(biz):
+            session.add(ProcessedMessage(channel=channel, message_id=message_id))
+            session.commit()
+            return [Reply("Financial trade profile sharing is available on Trader and Business plans. Upgrade your plan to share verified trade metrics with lenders and suppliers.")]
+        p_data = profile.compute_financial_profile(session, biz.id, today=today)
+        mat = p_data["record_maturity"]
+        act = p_data["active_days_ratio"]
+        col = p_data["collection_rate"]
+        days_col = p_data["average_days_to_collect"]
+        debt = p_data["debt_concentration"]
+        msg_profile = (
+            f"📊 *Verified Financial Trade Profile*\n"
+            f"Merchant: {p_data['business_name']}\n"
+            f"• Record History: {mat['weeks']} weeks ({mat['days']} days)\n"
+            f"• Active Days: {act['percentage']}%\n"
+            f"• Collection Rate: {col['percentage']}%\n"
+            f"• Avg Days to Collect: {days_col['days']} days\n"
+            f"• Outstanding Debt: {debt['total_debt_naira']} (Top 3 share: {debt['top_3_share_pct']}%)\n\n"
+            "View partner sharing links and consents in your dashboard under Profile."
+        )
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return [Reply(msg_profile)]
+
     clarify = _open_clarify(session, business_id, user_id)
     if clarify is not None:  # this message answers our earlier question
         text = f"{clarify.payload['transcript']} {text}"
@@ -310,6 +337,30 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
         from app.services import staff
         tx = staff.reject_transaction(session, business_id, pending_id, user_id)
         return [Reply(f"Sale of {fmt_naira(tx.total_kobo)} rejected.")]
+
+    # Partner consent approval buttons
+    if action == "approve_consent":
+        from app.services import profile
+        p_act = session.get(PendingAction, pending_id)
+        if p_act and p_act.business_id == business_id and p_act.status == "open":
+            partner = p_act.payload.get("partner", "Partner")
+            scope = p_act.payload.get("scope", "read_profile")
+            exp_days = p_act.payload.get("expires_in_days", 30)
+            consent = profile.create_consent_record(session, business_id, partner, scope, exp_days)
+            _, share_url, _ = profile.create_share_link(session, consent.id)
+            p_act.status = "applied"
+            session.commit()
+            return [Reply(f"Consent approved for {partner}! Share link:\n{share_url}")]
+        return [Reply("Consent request not found or already processed.")]
+
+    if action == "reject_consent":
+        p_act = session.get(PendingAction, pending_id)
+        if p_act and p_act.business_id == business_id and p_act.status == "open":
+            partner = p_act.payload.get("partner", "Partner")
+            p_act.status = "cancelled"
+            session.commit()
+            return [Reply(f"Consent request for {partner} declined.")]
+        return [Reply("Consent request not found or already processed.")]
     # Billing & Plan button actions
     if action == "upgrade_trader":
         billing.activate_plan(session, business_id, "trader")
