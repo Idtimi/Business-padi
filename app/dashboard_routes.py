@@ -103,6 +103,7 @@ def login_page(request: Request, token: str | None = None, error: str | None = N
     return templates.TemplateResponse(request, "login.html", {"error": error})
 
 
+@router.get("/login/demo")
 @router.post("/login/demo")
 def demo_login_action(db: Session = Depends(get_db)):
     """One-click instant login for judging and live evaluation."""

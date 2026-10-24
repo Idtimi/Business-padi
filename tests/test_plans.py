@@ -56,13 +56,31 @@ def press(s, b, u, reply, index=0):
 def test_plan_matrix_and_allowed_checks(session):
     """Test feature gating across different tiers."""
     u, b_starter = make_business(session, "Starter Shop", plan="starter")
+    u, b_solo = make_business(session, "Solo Shop", plan="solo")
     u, b_trader = make_business(session, "Trader Shop", plan="trader")
     u, b_biz = make_business(session, "Business Shop", plan="business")
 
     # Invoices
     assert not plans.allowed(b_starter, "invoices")
+    assert plans.allowed(b_solo, "invoices")
     assert plans.allowed(b_trader, "invoices")
     assert plans.allowed(b_biz, "invoices")
+
+    # Stock
+    assert not plans.allowed(b_starter, "stock_tracking")
+    assert plans.allowed(b_solo, "stock_tracking")
+    assert plans.allowed(b_trader, "stock_tracking")
+
+    # Staff (Business plan only)
+    assert not plans.allowed(b_starter, "staff_accounts")
+    assert not plans.allowed(b_solo, "staff_accounts")
+    assert not plans.allowed(b_trader, "staff_accounts")
+    assert plans.allowed(b_biz, "staff_accounts")
+
+    # Solo 2500 tier specs
+    solo_def = plans.get_plan("solo")
+    assert solo_def.price_kobo == to_kobo(2_500)
+    assert solo_def.monthly_voice_entries == 50
 
     # Receipts (all tiers can issue receipts)
     assert plans.allowed(b_starter, "receipts")

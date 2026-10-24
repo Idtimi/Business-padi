@@ -90,6 +90,38 @@
         </div>
     </div>
 
+    <!-- SOLO TRADER (₦2,500 TIER) -->
+    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; position: relative; border: 2px solid {% if billing_status.plan_key == 'solo' %}var(--primary){% else %}#f59e0b{% endif %}; background: white;">
+        <span style="position: absolute; top: -12px; right: 16px; background: #f59e0b; color: white; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+            {% if billing_status.plan_key == 'solo' %}CURRENT PLAN{% else %}POPULAR STARTER PRO{% endif %}
+        </span>
+        <div>
+            <h3 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.25rem;">Solo Trader</h3>
+            <div style="font-size: 2rem; font-weight: 800; color: #b45309; margin: 0.5rem 0;">₦2,500 <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">/ month</span></div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">Affordable automation for solo artisans, kiosks & market vendors.</p>
+            
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; line-height: 1.8;">
+                <li>✓ <strong>50 Voice Entries</strong> / month</li>
+                <li>✓ <strong>Branded Invoices & Receipts</strong> (PDF)</li>
+                <li>✓ <strong>Basic Stock Tracking</strong> (Carton/Sachet)</li>
+                <li>✓ Scheduled WhatsApp Debt Reminders</li>
+                <li>✓ Customer Account Statements</li>
+                <li>✓ Weekly Sales Performance Summary</li>
+                <li style="color: var(--text-muted);">✗ Attendant Staff Accounts</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 1.5rem;">
+            {% if billing_status.plan_key == 'solo' %}
+            <button class="btn btn-outline" style="width: 100%; cursor: default; opacity: 0.8;" disabled>Current Active Plan</button>
+            {% else %}
+            <form method="post" action="/d/billing/upgrade?plan=solo">
+                <button type="submit" class="btn btn-outline" style="width: 100%; border-color: #f59e0b; color: #b45309; font-weight: 700;">Switch to Solo (₦2,500/mo)</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- TRADER TIER -->
     <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; position: relative; border: 2px solid {% if billing_status.plan_key == 'trader' %}var(--primary){% else %}#10b981{% endif %}; background: white;">
         <span style="position: absolute; top: -12px; right: 16px; background: #10b981; color: white; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
