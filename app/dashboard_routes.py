@@ -47,6 +47,12 @@ def get_current_user_and_biz(
     cookie_val = request.cookies.get(dashboard.SESSION_COOKIE_NAME)
     res = dashboard.verify_session_cookie(cookie_val)
     if res is None:
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept and not accept.startswith("*/*"):
+            raise HTTPException(
+                status_code=status.HTTP_303_SEE_OTHER,
+                headers={"Location": "/d/login"},
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Dashboard session invalid or expired. Please request a new login link via WhatsApp.",
@@ -55,6 +61,12 @@ def get_current_user_and_biz(
     user = db.get(User, user_id)
     biz = db.get(Business, biz_id)
     if user is None or biz is None:
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept and not accept.startswith("*/*"):
+            raise HTTPException(
+                status_code=status.HTTP_303_SEE_OTHER,
+                headers={"Location": "/d/login"},
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User or business not found.",
@@ -67,7 +79,7 @@ def get_current_user_and_biz(
 # ---------------------------------------------------------------------------
 
 @router.get("/login", response_class=HTMLResponse)
-def login_page(request: Request, token: str | None = None, db: Session = Depends(get_db)):
+def login_page(request: Request, token: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
     if token:
         ok, msg, action = dashboard.verify_magic_token(db, token)
         if not ok or action is None:
@@ -88,7 +100,77 @@ def login_page(request: Request, token: str | None = None, db: Session = Depends
             samesite="lax",
         )
         return resp
-    return templates.TemplateResponse(request, "login.html", {})
+    return templates.TemplateResponse(request, "login.html", {"error": error})
+
+
+@router.post("/login/demo")
+def demo_login_action(db: Session = Depends(get_db)):
+    """One-click instant login for judging and live evaluation."""
+    # Find Mama Ngozi Provisions or the primary seeded shop
+    biz = db.scalar(
+        select(Business).where(Business.name.ilike("%Mama Ngozi%")).order_by(Business.id.desc())
+    )
+    if biz is None:
+        biz = db.scalar(select(Business).order_by(Business.id.desc()))
+    if biz is None:
+        raise HTTPException(status_code=404, detail="No business registered yet.")
+
+    owner_id = biz.owner_user_id
+    cookie = dashboard.create_session_cookie(owner_id, biz.id)
+    resp = RedirectResponse(url="/d", status_code=status.HTTP_303_SEE_OTHER)
+    resp.set_cookie(
+        key=dashboard.SESSION_COOKIE_NAME,
+        value=cookie,
+        httponly=True,
+        path="/",
+        samesite="lax",
+    )
+    return resp
+
+
+@router.post("/login/phone")
+def phone_login_action(
+    phone: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Direct phone number login for registered shop owners."""
+    clean_p = phone.strip().replace(" ", "").replace("-", "")
+    user = db.scalar(
+        select(User).where(
+            (User.channel_user_id == clean_p)
+            | (User.channel_user_id == clean_p.lstrip("+"))
+            | (User.channel_user_id.endswith(clean_p[-10:] if len(clean_p) >= 10 else clean_p))
+        )
+    )
+    if user is None:
+        return RedirectResponse(
+            url="/d/login?error=Phone+number+not+found.+Please+check+the+number+or+launch+the+demo+shop.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    biz = db.scalar(select(Business).where(Business.owner_user_id == user.id))
+    if biz is None:
+        # Check if staff
+        st = db.scalar(select(Staff).where(Staff.user_id == user.id, Staff.active == 1))
+        if st is not None:
+            biz = db.get(Business, st.business_id)
+
+    if biz is None:
+        return RedirectResponse(
+            url="/d/login?error=No+active+shop+found+for+this+phone+number.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    cookie = dashboard.create_session_cookie(user.id, biz.id)
+    resp = RedirectResponse(url="/d", status_code=status.HTTP_303_SEE_OTHER)
+    resp.set_cookie(
+        key=dashboard.SESSION_COOKIE_NAME,
+        value=cookie,
+        httponly=True,
+        path="/",
+        samesite="lax",
+    )
+    return resp
 
 
 @router.get("/logout")
