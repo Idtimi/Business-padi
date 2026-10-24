@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Plans & Billing{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700;">Plans & Subscriptions</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Choose the right tier for your trading business or buy extra voice entries.</p>
+    </div>
+</div>
+
+{% if message %}
+<div class="card" style="background: #ecfdf5; border-color: #a7f3d0; color: #065f46; margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+    ✅ <strong>{{ message }}</strong>
+</div>
+{% endif %}
+
+<!-- Current Usage Summary Card -->
+<div class="card" style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Current Subscription</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--primary); margin: 0.25rem 0;">
+                {{ billing_status.plan_name }} Plan
+                <span class="badge badge-{{ billing_status.plan_key }}">{{ billing_status.plan_key }}</span>
+            </div>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">
+                {% if billing_status.price_kobo > 0 %}
+                    Cost: <strong>{{ billing_status.price_kobo | fmt_naira }} / month</strong>
+                    {% if billing_status.renews_at %} &bull; Renews on {{ billing_status.renews_at[:10] }}{% endif %}
+                {% else %}
+                    Free Forever &bull; No credit card required
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="min-width: 260px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.4rem;">
+                <span style="font-weight: 600;">Voice Entries Quota:</span>
+                <span><strong>{{ billing_status.voice_used }}</strong> / {{ billing_status.total_cap }}</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+                {% set pct = (billing_status.voice_used / (billing_status.total_cap or 1) * 100) | round | int %}
+                <div style="width: {{ [pct, 100]|min }}%; height: 100%; background: {% if pct > 85 %}var(--danger){% elif pct > 60 %}var(--warning){% else %}var(--primary){% endif %}; border-radius: 999px;"></div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem; display: flex; justify-content: space-between;">
+                <span>Base: {{ billing_status.voice_base_cap }}</span>
+                {% if billing_status.extra_entries > 0 %}
+                <span style="color: var(--primary); font-weight: 600;">+{{ billing_status.extra_entries }} pack entries</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pricing Matrix Cards -->
+<h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">Available Plans</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;">
+    
+    <!-- STARTER TIER -->
+    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; position: relative; {% if billing_status.plan_key == 'starter' %}border: 2px solid var(--primary); background: #fdfdfd;{% endif %}">
+        {% if billing_status.plan_key == 'starter' %}
+        <span style="position: absolute; top: -12px; right: 16px; background: var(--primary); color: white; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">CURRENT PLAN</span>
+        {% endif %}
+        <div>
+            <h3 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.25rem;">Starter</h3>
+            <div style="font-size: 2rem; font-weight: 800; margin: 0.5rem 0;">₦0 <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">/ month</span></div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">Ideal for single-person stalls and market testing.</p>
+            
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; line-height: 1.8;">
+                <li>✓ <strong>20 Voice Entries</strong> / month</li>
+                <li>✓ Credit Book & Debt Tracking</li>
+                <li>✓ Basic PDF Receipts</li>
+                <li>✓ Weekly Sales Summary</li>
+                <li style="color: var(--text-muted);">✗ No Invoices or Statements</li>
+                <li style="color: var(--text-muted);">✗ No Stock / Inventory tracking</li>
+                <li style="color: var(--text-muted);">✗ No Bank Credit Profile</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 1.5rem;">
+            {% if billing_status.plan_key == 'starter' %}
+            <button class="btn btn-outline" style="width: 100%; cursor: default; opacity: 0.8;" disabled>Current Active Plan</button>
+            {% else %}
+            <form method="post" action="/d/billing/downgrade">
+                <button type="submit" class="btn btn-outline" style="width: 100%;">Downgrade to Starter</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- TRADER TIER -->
+    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; position: relative; border: 2px solid {% if billing_status.plan_key == 'trader' %}var(--primary){% else %}#10b981{% endif %}; background: white;">
+        <span style="position: absolute; top: -12px; right: 16px; background: #10b981; color: white; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+            {% if billing_status.plan_key == 'trader' %}CURRENT PLAN{% else %}POPULAR FOR TRADERS{% endif %}
+        </span>
+        <div>
+            <h3 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.25rem;">Trader</h3>
+            <div style="font-size: 2rem; font-weight: 800; color: #047857; margin: 0.5rem 0;">₦5,000 <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">/ month</span></div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">For busy retail shops, wholesalers, and provision stores.</p>
+            
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; line-height: 1.8;">
+                <li>✓ <strong>100 Voice Entries</strong> / month</li>
+                <li>✓ <strong>Branded Invoices & Receipts</strong> (PDF)</li>
+                <li>✓ <strong>Stock & Inventory Tracking</strong> (Carton/Sachet)</li>
+                <li>✓ <strong>Bank Credit Trade Profile</strong> (Loan Share Links)</li>
+                <li>✓ Scheduled WhatsApp Debt Reminders</li>
+                <li>✓ Daily & Weekly Performance Reports</li>
+                <li style="color: var(--text-muted);">✗ Attendant Staff Accounts</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 1.5rem;">
+            {% if billing_status.plan_key == 'trader' %}
+            <button class="btn btn-outline" style="width: 100%; cursor: default; opacity: 0.8;" disabled>Current Active Plan</button>
+            {% else %}
+            <form method="post" action="/d/billing/upgrade?plan=trader">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Upgrade to Trader (₦5,000/mo)</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- BUSINESS TIER -->
+    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; position: relative; {% if billing_status.plan_key == 'business' %}border: 2px solid var(--primary);{% endif %}">
+        {% if billing_status.plan_key == 'business' %}
+        <span style="position: absolute; top: -12px; right: 16px; background: var(--primary); color: white; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">CURRENT PLAN</span>
+        {% endif %}
+        <div>
+            <h3 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.25rem;">Business</h3>
+            <div style="font-size: 2rem; font-weight: 800; color: #1e3a8a; margin: 0.5rem 0;">₦15,000 <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">/ month</span></div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">For multi-attendant teams, distributors, and high-volume stores.</p>
+            
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; line-height: 1.8;">
+                <li>✓ <strong>300 Voice Entries</strong> / month</li>
+                <li>✓ <strong>3 Staff Attendant Accounts</strong></li>
+                <li>✓ Large Sale Approvals (≥ ₦100k)</li>
+                <li>✓ Automated Smart Reminders</li>
+                <li>✓ Full P&L PDF Statements</li>
+                <li>✓ Custom Shop Logo & Color Branding</li>
+                <li>✓ Everything in Trader plan</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 1.5rem;">
+            {% if billing_status.plan_key == 'business' %}
+            <button class="btn btn-outline" style="width: 100%; cursor: default; opacity: 0.8;" disabled>Current Active Plan</button>
+            {% else %}
+            <form method="post" action="/d/billing/upgrade?plan=business">
+                <button type="submit" class="btn btn-primary" style="width: 100%; background: #1e3a8a; border-color: #1e3a8a;">Upgrade to Business (₦15,000/mo)</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Extra Voice Entry Boost Packs -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+        <div>
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.25rem;">⚡ Need More Voice Entries?</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                Run out of quota this month? Buy an instant booster pack without changing your plan.
+            </p>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">
+                Each pack adds <strong>+25 voice entries</strong> to your current monthly limit.
+            </div>
+        </div>
+        
+        <form method="post" action="/d/billing/buy-pack">
+            <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
+                + Buy 25 Voice Entries (₦2,500)
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

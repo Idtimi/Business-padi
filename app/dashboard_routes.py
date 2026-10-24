@@ -26,7 +26,7 @@ from app.models import (
     get_tz,
 )
 from app.money import fmt_naira
-from app.services import dashboard, documents, ledger, plans, reports
+from app.services import billing, dashboard, documents, ledger, plans, reports
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -647,4 +647,67 @@ def profile_page(
             "plan_def": plan_def,
             "active_page": "profile",
         },
+    )
+
+
+@router.get("/billing", response_class=HTMLResponse)
+def billing_page(
+    request: Request,
+    msg: str | None = None,
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    status_data = billing.get_billing_status(db, biz)
+
+    return templates.TemplateResponse(
+        request,
+        "billing.html",
+        {
+            "user": user,
+            "business": biz,
+            "billing_status": status_data,
+            "message": msg,
+            "active_page": "billing",
+        },
+    )
+
+
+@router.post("/billing/upgrade")
+def billing_upgrade(
+    plan: str = "trader",
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    billing.activate_plan(db, biz.id, plan)
+    return RedirectResponse(
+        url=f"/d/billing?msg=Plan+upgraded+to+{plan.title()}+successfully!",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/billing/downgrade")
+def billing_downgrade(
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    billing.downgrade_plan(db, biz.id, "starter")
+    return RedirectResponse(
+        url="/d/billing?msg=Plan+downgraded+to+Starter.+All+historical+data+is+preserved.",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/billing/buy-pack")
+def billing_buy_pack(
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    extra = billing.buy_entry_pack(db, biz.id)
+    return RedirectResponse(
+        url=f"/d/billing?msg=Successfully+added+{extra}+voice+entries+to+your+quota!",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
