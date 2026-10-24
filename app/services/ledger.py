@@ -130,9 +130,35 @@ def confirm(session: Session, business_id: int, pending_id: int) -> Transaction:
         _allocate_payment(session, business_id, customer.id, data["total_kobo"], data["source_msg_id"])
         from app.services import reminders
         reminders.sync_reminders_after_payment(session, business_id, customer.id)
-    elif tx.kind == "sale" and tx.due_date and tx.paid_kobo < tx.total_kobo and customer is not None:
-        from app.services import reminders
-        reminders.schedule_reminders_for_sale(session, business_id, customer.id, tx.id, tx.due_date)
+    elif tx.kind == "sale":
+        if tx.due_date and tx.paid_kobo < tx.total_kobo and customer is not None:
+            from app.services import reminders
+            reminders.schedule_reminders_for_sale(session, business_id, customer.id, tx.id, tx.due_date)
+        from app.services import stock
+        for line in (data.get("lines") or []):
+            if line.get("name") and line.get("qty"):
+                stock.record_sale(
+                    session=session,
+                    business_id=business_id,
+                    item_name=line.get("name"),
+                    qty=line.get("qty", 1.0),
+                    unit=line.get("unit"),
+                    transaction_id=tx.id,
+                )
+    elif tx.kind == "restock":
+        from app.services import stock
+        for line in (data.get("lines") or []):
+            if line.get("name") and line.get("qty"):
+                stock.record_restock(
+                    session=session,
+                    business_id=business_id,
+                    item_name=line.get("name"),
+                    qty=line.get("qty", 1.0),
+                    unit=line.get("unit"),
+                    unit_cost_kobo=line.get("unit_price_kobo", 0),
+                    supplier=data.get("supplier"),
+                    transaction_id=tx.id,
+                )
 
     p.status = "applied"
     session.commit()
