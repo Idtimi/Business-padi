@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Shop Profile & Consents{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+    <h1 style="font-size: 1.5rem; font-weight: 700;">Shop Profile & Consents</h1>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">Business details, subscription plan, and partner access permissions.</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-title">Business Name</div>
+        <div class="stat-value" style="font-size: 1.35rem;">{{ business.name or "My Shop" }}</div>
+        <div class="stat-desc">Owner: {{ user.display_name or user.channel_user_id }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Subscription Plan</div>
+        <div class="stat-value" style="text-transform: capitalize; color: var(--primary);">{{ business.plan or "starter" }}</div>
+        <div class="stat-desc">Status: Active</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Voice Entry Quota</div>
+        <div class="stat-value" style="font-size: 1.35rem;">{{ plan_def.monthly_voice_entries }} / month</div>
+        <div class="stat-desc">Staff Seats: {{ plan_def.staff_accounts }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem;">Partner Consents & Data Sharing</h2>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Voice Ledger strictly protects your trade data. Partner links only export aggregated profile metrics (turnover, collection rate, debt concentration) without personal customer details.
+    </p>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Partner</th>
+                    <th>Scope</th>
+                    <th>Granted At</th>
+                    <th>Expires At</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if consents %}
+                    {% for c in consents %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ c.partner }}</td>
+                        <td><span class="badge badge-starter">{{ c.scope }}</span></td>
+                        <td>{{ c.granted_at[:16] }}</td>
+                        <td>{{ c.expires_at[:16] }}</td>
+                        <td>
+                            {% if c.revoked_at %}
+                                <span class="badge badge-danger">Revoked</span>
+                            {% else %}
+                                <span class="badge badge-success">Active</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No external partner consents granted.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

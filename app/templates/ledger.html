@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Shop Ledger{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700;">Ledger Transactions</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Complete financial record of sales, expenses, and customer repayments.</p>
+    </div>
+    <div>
+        <a href="/d/ledger/export.csv" class="btn btn-primary">📥 Export Ledger CSV</a>
+    </div>
+</div>
+
+<div class="card">
+    <form method="get" action="/d/ledger" class="filters-form">
+        <label for="kind" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Kind:</label>
+        <select name="kind" id="kind" class="form-control">
+            <option value="">All Kinds</option>
+            <option value="sale" {% if current_kind == 'sale' %}selected{% endif %}>Sales</option>
+            <option value="expense" {% if current_kind == 'expense' %}selected{% endif %}>Expenses</option>
+            <option value="payment_received" {% if current_kind == 'payment_received' %}selected{% endif %}>Repayments</option>
+            <option value="restock" {% if current_kind == 'restock' %}selected{% endif %}>Restocks</option>
+        </select>
+
+        <label for="status" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Status:</label>
+        <select name="status" id="status" class="form-control">
+            <option value="">All Statuses</option>
+            <option value="confirmed" {% if current_status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+            <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending Approval</option>
+            <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+        </select>
+
+        <label for="q" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Search:</label>
+        <input type="text" name="q" id="q" value="{{ current_q or '' }}" placeholder="Search customer, item..." class="form-control">
+
+        <button type="submit" class="btn btn-outline">Apply Filters</button>
+        {% if current_kind or current_status or current_q %}
+            <a href="/d/ledger" class="btn btn-outline" style="color: var(--danger);">Reset</a>
+        {% endif %}
+    </form>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Kind</th>
+                    <th>Customer / Supplier</th>
+                    <th>Items / Description</th>
+                    <th>Total</th>
+                    <th>Paid</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if transactions %}
+                    {% for tx in transactions %}
+                    <tr>
+                        <td style="color: var(--text-muted);">#{{ tx.id }}</td>
+                        <td>{{ tx.created_at[:16] }}</td>
+                        <td><span class="badge badge-starter">{{ tx.kind }}</span></td>
+                        <td>
+                            {% if tx.customer_id %}
+                                <a href="/d/customers/{{ tx.customer_id }}" style="color: var(--primary); text-decoration: none; font-weight: 500;">
+                                    {{ tx.customer_name }}
+                                </a>
+                            {% else %}
+                                {{ tx.customer_name or "-" }}
+                            {% endif %}
+                        </td>
+                        <td style="font-size: 0.85rem;">{{ tx.items_summary or "-" }}</td>
+                        <td style="font-weight: 600;">{{ tx.total_kobo | fmt_naira }}</td>
+                        <td>{{ tx.paid_kobo | fmt_naira }}</td>
+                        <td>{{ tx.due_date or "-" }}</td>
+                        <td>
+                            {% if tx.status == 'confirmed' %}
+                                <span class="badge badge-success">confirmed</span>
+                            {% elif tx.status == 'pending' %}
+                                <span class="badge badge-warning">pending</span>
+                            {% else %}
+                                <span class="badge badge-danger">{{ tx.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">No matching transactions found.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

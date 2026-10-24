@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Financial Reports & Summaries{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700;">Financial Reports & Summaries</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Verified totals, profit estimates, and business performance.</p>
+    </div>
+    <div>
+        <a href="/d/reports/pnl.pdf" class="btn btn-primary">📄 Download P&L PDF</a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-title">Confirmed Sales (All Time)</div>
+        <div class="stat-value" style="color: var(--primary);">{{ summary.sales_kobo | fmt_naira }}</div>
+        <div class="stat-desc">{{ summary.sales_count }} sales transactions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Cash Collected</div>
+        <div class="stat-value" style="color: var(--success);">{{ summary.cash_collected_kobo | fmt_naira }}</div>
+        <div class="stat-desc">Cash + repayments</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Total Expenses</div>
+        <div class="stat-value" style="color: var(--danger);">{{ summary.expenses_kobo | fmt_naira }}</div>
+        <div class="stat-desc">{{ summary.expenses_count }} expense records</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Estimated Net Profit</div>
+        <div class="stat-value" {% if summary.net_profit_kobo >= 0 %}style="color: var(--primary);"{% else %}style="color: var(--danger);"{% endif %}>
+            {{ summary.net_profit_kobo | fmt_naira }}
+        </div>
+        <div class="stat-desc">Sales &minus; COGS &minus; Expenses</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem;">Top Debtors</h2>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Customer Name</th>
+                    <th>Phone</th>
+                    <th>Balance Owed</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if summary.top_debtors %}
+                    {% for d in summary.top_debtors %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ d.name }}</td>
+                        <td>{{ d.phone or "-" }}</td>
+                        <td style="font-weight: 700; color: var(--warning);">{{ d.balance_kobo | fmt_naira }}</td>
+                        <td>
+                            <a href="/d/customers/{{ d.id }}" class="btn btn-outline btn-sm">View &rarr;</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">No outstanding customer debts!</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

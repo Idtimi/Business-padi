@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Staff & Roles{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700;">Staff & Team Permissions</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Manage shop attendants, roles, and invite codes.</p>
+    </div>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.15rem; font-weight: 600;">Team Members ({{ staff_members | length }} / {{ max_staff }})</h2>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Staff Name / User</th>
+                    <th>Role</th>
+                    <th>Can View Reports</th>
+                    <th>Can Issue Invoices</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if staff_members %}
+                    {% for s in staff_members %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ s.display_name or s.phone }}</td>
+                        <td><span class="badge badge-starter">{{ s.role }}</span></td>
+                        <td>{{ "Yes" if s.can_view_reports else "No" }}</td>
+                        <td>{{ "Yes" if s.can_issue_invoices else "No" }}</td>
+                        <td>
+                            {% if s.active %}
+                                <span class="badge badge-success">Active</span>
+                            {% else %}
+                                <span class="badge badge-danger">Revoked</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No staff members joined yet.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem;">Active Staff Invites</h2>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Invite Code</th>
+                    <th>Role</th>
+                    <th>Created At</th>
+                    <th>Expires At</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if invites %}
+                    {% for inv in invites %}
+                    <tr>
+                        <td style="font-family: monospace; font-weight: 700; color: var(--primary);">{{ inv.code }}</td>
+                        <td><span class="badge badge-starter">{{ inv.role }}</span></td>
+                        <td>{{ inv.created_at[:16] }}</td>
+                        <td>{{ inv.expires_at[:16] }}</td>
+                        <td>
+                            {% if inv.used %}
+                                <span class="badge badge-starter">Used</span>
+                            {% else %}
+                                <span class="badge badge-success">Active</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No active invite codes. Generate an invite code by typing "invite staff" in WhatsApp.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

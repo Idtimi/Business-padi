@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Documents - Receipts & Invoices{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700;">Issued Documents</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Branded receipts, invoices, and customer account statements.</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Doc Number</th>
+                    <th>Kind</th>
+                    <th>Customer</th>
+                    <th>Total</th>
+                    <th>Issued At</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if documents %}
+                    {% for doc in documents %}
+                    <tr>
+                        <td style="font-weight: 600; font-family: monospace;">{{ doc.doc_number }}</td>
+                        <td><span class="badge badge-starter">{{ doc.kind }}</span></td>
+                        <td>{{ doc.customer_name or "-" }}</td>
+                        <td style="font-weight: 600;">{{ doc.total_kobo | fmt_naira }}</td>
+                        <td>{{ doc.issued_at[:16] }}</td>
+                        <td>
+                            {% if doc.status == 'issued' %}
+                                <span class="badge badge-success">issued</span>
+                            {% else %}
+                                <span class="badge badge-danger">{{ doc.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/d/documents/{{ doc.id }}/pdf" class="btn btn-outline btn-sm">📥 Download PDF</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No documents issued yet.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

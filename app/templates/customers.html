@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Customers - Debtors Book{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700;">Customer & Debtors Book</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Track all customer balances, debts, and contact info.</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Customer Name</th>
+                    <th>Phone</th>
+                    <th>Current Balance Owed</th>
+                    <th>Opt-In Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if customers %}
+                    {% for c in customers %}
+                    <tr>
+                        <td style="font-weight: 600;">
+                            <a href="/d/customers/{{ c.id }}" style="color: var(--primary); text-decoration: none;">
+                                {{ c.name }}
+                            </a>
+                        </td>
+                        <td>{{ c.phone or "-" }}</td>
+                        <td style="font-weight: 700; {% if c.balance_kobo > 0 %}color: var(--warning);{% else %}color: var(--success);{% endif %}">
+                            {{ c.balance_kobo | fmt_naira }}
+                        </td>
+                        <td>
+                            {% if c.opted_out %}
+                                <span class="badge badge-danger">Opted Out (STOP)</span>
+                            {% elif c.opted_in %}
+                                <span class="badge badge-success">Opted In</span>
+                            {% else %}
+                                <span class="badge badge-starter">Standard</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/d/customers/{{ c.id }}" class="btn btn-outline btn-sm">View Details &rarr;</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No customers added yet.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

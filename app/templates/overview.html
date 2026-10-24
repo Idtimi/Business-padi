@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Shop Overview{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700;">Welcome back, {{ user.display_name or "Shop Owner" }}!</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Here is your shop's performance for today ({{ metrics.date_str }}).</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="/d/ledger/export.csv" class="btn btn-outline">📥 Export Ledger CSV</a>
+        <a href="/d/ledger" class="btn btn-primary">View Full Ledger</a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-title">Today's Sales</div>
+        <div class="stat-value">{{ metrics.today_sales_kobo | fmt_naira }}</div>
+        <div class="stat-desc">{{ metrics.today_sales_count }} sales recorded today</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Total Money Owed</div>
+        <div class="stat-value" style="color: var(--warning);">{{ metrics.total_owed_kobo | fmt_naira }}</div>
+        <div class="stat-desc">Across {{ metrics.debtor_count }} debtors</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Low Stock Items</div>
+        <div class="stat-value" {% if metrics.low_stock_count > 0 %}style="color: var(--danger);"{% endif %}>
+            {{ metrics.low_stock_count }}
+        </div>
+        <div class="stat-desc">
+            {% if not metrics.has_stock_plan %}
+                <span class="badge badge-starter">Stock plan required</span>
+            {% elif metrics.low_stock_count > 0 %}
+                Items need restock
+            {% else %}
+                All items healthy
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.15rem; font-weight: 600;">Recent Transactions</h2>
+        <a href="/d/ledger" class="btn btn-outline btn-sm">See All &rarr;</a>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Kind</th>
+                    <th>Customer / Supplier</th>
+                    <th>Total</th>
+                    <th>Paid</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if recent_txs %}
+                    {% for tx in recent_txs %}
+                    <tr>
+                        <td>{{ tx.created_at[:16] }}</td>
+                        <td><span class="badge badge-starter">{{ tx.kind }}</span></td>
+                        <td>{{ tx.customer_name or "-" }}</td>
+                        <td style="font-weight: 600;">{{ tx.total_kobo | fmt_naira }}</td>
+                        <td>{{ tx.paid_kobo | fmt_naira }}</td>
+                        <td>
+                            {% if tx.status == 'confirmed' %}
+                                <span class="badge badge-success">confirmed</span>
+                            {% elif tx.status == 'pending' %}
+                                <span class="badge badge-warning">pending</span>
+                            {% else %}
+                                <span class="badge badge-danger">{{ tx.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No transactions recorded yet. Record via WhatsApp voice note or text!</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

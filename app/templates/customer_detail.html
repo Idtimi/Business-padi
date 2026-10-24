@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}{{ customer.name }} - Customer Detail{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+    <a href="/d/customers" style="color: var(--primary); text-decoration: none; font-size: 0.9rem;">&larr; Back to Customers</a>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700;">{{ customer.name }}</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Phone: {{ customer.phone or "Not recorded" }}</p>
+    </div>
+    <div>
+        <a href="/d/customers/{{ customer.id }}/statement.pdf" class="btn btn-primary">📄 Download Statement PDF</a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-title">Current Balance Owed</div>
+        <div class="stat-value" {% if balance_kobo > 0 %}style="color: var(--warning);"{% else %}style="color: var(--success);"{% endif %}>
+            {{ balance_kobo | fmt_naira }}
+        </div>
+        <div class="stat-desc">{% if balance_kobo > 0 %}Active balance to settle{% else %}Settled in full{% endif %}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Total Transactions</div>
+        <div class="stat-value">{{ transactions | length }}</div>
+        <div class="stat-desc">Lifetime sales & adjustments</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Total Repayments</div>
+        <div class="stat-value">{{ payments | length }}</div>
+        <div class="stat-desc">Payments allocated</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem;">Transaction History</h2>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Kind</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Paid</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if transactions %}
+                    {% for tx in transactions %}
+                    <tr>
+                        <td>{{ tx.created_at[:16] }}</td>
+                        <td><span class="badge badge-starter">{{ tx.kind }}</span></td>
+                        <td>{{ tx.items_summary or "-" }}</td>
+                        <td style="font-weight: 600;">{{ tx.total_kobo | fmt_naira }}</td>
+                        <td>{{ tx.paid_kobo | fmt_naira }}</td>
+                        <td>{{ tx.due_date or "-" }}</td>
+                        <td><span class="badge badge-success">{{ tx.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No transaction history for this customer.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

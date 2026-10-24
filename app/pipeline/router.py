@@ -267,6 +267,14 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return [Reply(rep_text)]
 
+    # Dashboard magic link command
+    if lower in ("/dashboard", "dashboard", "/login", "login") and biz:
+        from app.services import dashboard
+        _, link_url = dashboard.generate_magic_link(session, user_id, business_id)
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return [Reply(f"Here is your secure link to access the shop dashboard:\n{link_url}\n\nThis link expires in 15 minutes.")]
+
     clarify = _open_clarify(session, business_id, user_id)
     if clarify is not None:  # this message answers our earlier question
         text = f"{clarify.payload['transcript']} {text}"
