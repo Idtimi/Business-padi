@@ -11,6 +11,17 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def get_tz():
+    from app.config import settings
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(settings.tz)
+    except Exception:
+        from datetime import timezone, timedelta
+        return timezone(timedelta(hours=1))
+
+
+
 # ---------- identity ----------
 class User(Base):
     __tablename__ = "users"

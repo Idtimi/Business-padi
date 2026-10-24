@@ -259,6 +259,14 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return [Reply(rem_resp)]
 
+    # Admin cost report command
+    if lower in ("/cost report", "cost report", "/cost_report", "cost_report"):
+        from app.services import costs
+        rep_text = costs.generate_cost_report_text(session, today=today)
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return [Reply(rep_text)]
+
     clarify = _open_clarify(session, business_id, user_id)
     if clarify is not None:  # this message answers our earlier question
         text = f"{clarify.payload['transcript']} {text}"

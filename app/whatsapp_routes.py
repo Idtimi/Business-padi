@@ -10,6 +10,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.i18n import t
 from app.pipeline.handler import handle_incoming
+from app.services.templates import update_delivery_status
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -62,8 +63,10 @@ async def receive(request: Request, background: BackgroundTasks):
     except ValueError:
         return JSONResponse({"error": "bad json"}, status_code=400)
     messages, statuses = parse_webhook(payload)
-    for s in statuses:  # delivery receipts: just noted for now, saved to the log in Phase 11
-        log.info("status %s for %s", s.get("status"), s.get("id"))
+    if statuses:
+        with SessionLocal() as session:
+            for s in statuses:
+                update_delivery_status(session, s)
     if messages:
         background.add_task(process_messages, messages)
     return {"status": "ok"}

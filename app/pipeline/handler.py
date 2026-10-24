@@ -12,6 +12,7 @@ from app.pipeline import router
 from app.pipeline.asr import ASRClient, get_asr
 from app.pipeline.audio import AudioConversionError, AudioTooLong, download_and_convert
 from app.services import onboarding
+from app.services.costs import check_daily_budget, message_cost_kobo
 
 log = logging.getLogger(__name__)
 
@@ -19,10 +20,6 @@ log = logging.getLogger(__name__)
 def mask(ref: str) -> str:
     """Never keep full phone numbers in logs: 2348012345678 -> *********5678"""
     return "*" * max(len(ref) - 4, 0) + ref[-4:]
-
-
-def message_cost_kobo() -> int:
-    return round(settings.wa_usd_per_message * settings.usd_ngn * 100)
 
 
 def resolve_identity(session: Session, msg: IncomingMessage) -> tuple[User, Business | None]:
@@ -59,9 +56,9 @@ async def _handle_voice(channel: Channel, session: Session, biz: Business | None
         transcript = asr.transcribe(wav_path, user.language, [])
         log.info("ASR transcript for %s: %r", mask(msg.user_ref), transcript.text[:120])
         if not transcript.text.strip():
-            return [router.Reply(t(user.language, "try_again"))]
+            return [router.Reply(t(user.language, "voice_empty"))]
 
-        # If user is in onboarding, feed transcribed text to onboarding
+        # Check onboarding state first
         if user.state != "DONE":
             msg.text = transcript.text
             return await onboarding.handle_onboarding(channel, msg, user, session)
@@ -70,7 +67,8 @@ async def _handle_voice(channel: Channel, session: Session, biz: Business | None
             return [router.Reply("Please complete shop setup first.")]
 
         return router.handle_text(session, biz.id, user.id, transcript.text,
-                                  msg.message_id, user.language, channel=msg.channel, is_voice=True)
+                                  msg.message_id, user.language, channel=msg.channel,
+                                  is_voice=True)
     except AudioTooLong:
         max_s = settings.max_voice_seconds
         return [router.Reply(f"Voice note too long. Please keep it under {max_s} seconds.")]
@@ -96,15 +94,27 @@ def _non_text_replies(session: Session, biz: Business | None, user: User, msg: I
 
 async def _send_all(channel: Channel, session: Session, biz: Business | None, to_ref: str, replies: list[router.Reply]):
     for r in replies:
+        resp = None
         if r.buttons:
-            await channel.send_buttons(to_ref, r.text, r.buttons)
+            resp = await channel.send_buttons(to_ref, r.text, r.buttons)
         else:
-            await channel.send_text(to_ref, r.text)
+            resp = await channel.send_text(to_ref, r.text)
+
+        wa_mid = None
+        if isinstance(resp, dict) and resp.get("messages"):
+            wa_mid = resp["messages"][0].get("id")
+
         session.add(WaMessageLog(
-            business_id=biz.id if biz else None, to_ref=mask(to_ref), category="service",
+            business_id=biz.id if biz else None,
+            to_ref=mask(to_ref),
+            category="service",
             msg_type="interactive" if r.buttons else "text",
-            status="sent", est_cost_kobo=message_cost_kobo()))
+            wa_message_id=wa_mid,
+            status="sent",
+            est_cost_kobo=message_cost_kobo("service")
+        ))
     session.commit()
+    check_daily_budget(session)
 
 
 async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Session,
@@ -117,9 +127,24 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
     if session.get(ProcessedMessage, (msg.channel, msg.message_id)) is not None:
         return
 
-    # Check for staff invite join codes
+    # Check for STOP / START keywords
     text = (msg.text or "").strip()
     t_upper = text.upper()
+    if msg.kind == "text" and t_upper in ("STOP", "START"):
+        from app.services import templates
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        if t_upper == "STOP":
+            templates.opt_out_phone(session, msg.user_ref)
+            session.commit()
+            reply_text = "You have successfully opted out and will no longer receive automated messages. Reply START to opt back in."
+        else:
+            templates.opt_in_phone(session, msg.user_ref)
+            session.commit()
+            reply_text = "You have re-subscribed to messages. Text HELP to see available options."
+        await _send_all(channel, session, biz, msg.user_ref, [router.Reply(reply_text)])
+        return
+
+    # Check for staff invite join codes
     if msg.kind == "text" and (t_upper.startswith("JOIN-") or t_upper.startswith("/JOIN ")):
         code = t_upper.replace("/JOIN ", "JOIN-")
         from app.services import staff
@@ -148,7 +173,6 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         return
 
     # 2. Onboarded users: check for settings and help commands
-    text = (msg.text or "").strip()
     if msg.kind == "text" and text.lower().startswith("/settings"):
         replies = [onboarding.handle_settings_command(session, user, biz, text, user.language)]
         session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))

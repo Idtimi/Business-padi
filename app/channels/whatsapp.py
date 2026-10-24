@@ -3,7 +3,7 @@
 Provides:
 - verify_signature() – validate X-Hub-Signature-256 from Meta webhooks
 - parse_webhook()    – extract IncomingMessage list + delivery statuses
-- WhatsAppChannel    – send text, buttons, documents, and images via Graph API
+- WhatsAppChannel    – send text, buttons, documents, images, and templates via Graph API
 """
 
 import hashlib
@@ -135,8 +135,8 @@ class WhatsAppChannel:
         resp.raise_for_status()
         return resp.json()
 
-    async def send_text(self, user_ref: str, text: str) -> None:
-        await self._post({
+    async def send_text(self, user_ref: str, text: str) -> dict:
+        return await self._post({
             "messaging_product": "whatsapp",
             "to": user_ref,
             "type": "text",
@@ -144,7 +144,7 @@ class WhatsAppChannel:
         })
 
     async def send_buttons(self, user_ref: str, text: str,
-                           buttons: list[tuple[str, str]]) -> None:
+                           buttons: list[tuple[str, str]]) -> dict:
         """Send an interactive button message.
 
         Meta allows at most 3 buttons with titles <= 20 chars each.
@@ -156,7 +156,7 @@ class WhatsAppChannel:
                 "type": "reply",
                 "reply": {"id": btn_id, "title": title[:MAX_TITLE_LEN]},
             })
-        await self._post({
+        return await self._post({
             "messaging_product": "whatsapp",
             "to": user_ref,
             "recipient_type": "individual",
@@ -169,7 +169,7 @@ class WhatsAppChannel:
         })
 
     async def send_document(self, user_ref: str, media_id: str, filename: str,
-                            caption: str = "") -> None:
+                            caption: str = "") -> dict:
         body: dict = {
             "messaging_product": "whatsapp",
             "to": user_ref,
@@ -178,10 +178,10 @@ class WhatsAppChannel:
         }
         if caption:
             body["document"]["caption"] = caption
-        await self._post(body)
+        return await self._post(body)
 
     async def send_image(self, user_ref: str, media_id: str,
-                         caption: str = "") -> None:
+                         caption: str = "") -> dict:
         body: dict = {
             "messaging_product": "whatsapp",
             "to": user_ref,
@@ -190,7 +190,23 @@ class WhatsAppChannel:
         }
         if caption:
             body["image"]["caption"] = caption
-        await self._post(body)
+        return await self._post(body)
+
+    async def send_template(self, user_ref: str, template_name: str,
+                            language_code: str = "en",
+                            components: list[dict] | None = None) -> dict:
+        body: dict = {
+            "messaging_product": "whatsapp",
+            "to": user_ref,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": language_code},
+            },
+        }
+        if components:
+            body["template"]["components"] = components
+        return await self._post(body)
 
     async def download_media(self, media_id: str) -> tuple[bytes, str]:
         """Download a media file by its ID.
