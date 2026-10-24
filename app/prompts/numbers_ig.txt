@@ -1,0 +1,41 @@
+# Igbo Number Words & Worked Examples (30+ examples)
+# Format: <word form> -> <numeric value>
+
+otu -> 1
+abuo -> 2
+ato -> 3
+ano -> 4
+ise -> 5
+isii -> 6
+asaa -> 7
+asato -> 8
+itoolu -> 9
+iri -> 10
+iri na otu -> 11
+iri na abuo -> 12
+iri na ise -> 15
+iri abuo -> 20
+iri abuo na ise -> 25
+iri ato -> 30
+iri ano -> 40
+iri ise -> 50
+iri isii -> 60
+iri asaa -> 70
+iri asato -> 80
+iri itoolu -> 90
+nari -> 100
+nari abuo -> 200
+nari ise -> 500
+puku -> 1000
+puku abuo -> 2000
+puku ise -> 5000
+puku iri -> 10000
+puku iri na ise -> 15000
+puku iri abuo -> 20000
+puku iri abuo na ise -> 25000
+puku iri ato -> 30000
+puku iri ano na abuo na nari ise -> 42500
+puku iri ise -> 50000
+puku nari -> 100000
+nde otu -> 1000000
+nde abuo -> 2000000

@@ -49,14 +49,31 @@ def resolve_identity(session: Session, msg: IncomingMessage) -> tuple[User, Busi
 async def _handle_voice(channel: Channel, session: Session, biz: Business | None, user: User, msg: IncomingMessage,
                         asr: ASRClient | None = None) -> list[router.Reply]:
     """Download voice note -> convert to WAV -> ASR -> route as text."""
+    speech_lang = (user.state_data or {}).get("speech_language", user.language)
+    ui_lang = user.language
+
+    from config.languages import is_assist_or_planned, get_language, get_support_level
+    if is_assist_or_planned(speech_lang):
+        from app.models import Event
+        session.add(Event(
+            business_id=biz.id if biz else None,
+            user_id=user.id,
+            name="language_demand",
+            props={"language": speech_lang, "level": get_support_level(speech_lang), "action": "assist_fallback"},
+        ))
+        session.commit()
+        return [router.Reply(t(ui_lang, "assist_fallback", language=get_language(speech_lang)["name"]))]
+
     asr = asr or get_asr()
     tmp_dir = None
     try:
         wav_path, tmp_dir = await download_and_convert(channel, msg.media_ref)
-        transcript = asr.transcribe(wav_path, user.language, [])
-        log.info("ASR transcript for %s: %r", mask(msg.user_ref), transcript.text[:120])
-        if not transcript.text.strip():
-            return [router.Reply(t(user.language, "voice_empty"))]
+        from app.pipeline.glossary import get_glossary_keywords
+        glossary_kws = get_glossary_keywords(speech_lang)
+        transcript = asr.transcribe(wav_path, speech_lang, glossary_kws)
+        log.info("ASR transcript for %s (%s): %r", mask(msg.user_ref), speech_lang, transcript.text[:120])
+        if not transcript.text or len(transcript.text.strip()) < 3:
+            return [router.Reply(t(ui_lang, "repeat_prompt"))]
 
         # Check onboarding state first
         if user.state != "DONE":
@@ -67,8 +84,8 @@ async def _handle_voice(channel: Channel, session: Session, biz: Business | None
             return [router.Reply("Please complete shop setup first.")]
 
         return router.handle_text(session, biz.id, user.id, transcript.text,
-                                  msg.message_id, user.language, channel=msg.channel,
-                                  is_voice=True)
+                                  msg.message_id, ui_lang, channel=msg.channel,
+                                  is_voice=True, speech_lang=speech_lang)
     except AudioTooLong:
         max_s = settings.max_voice_seconds
         return [router.Reply(f"Voice note too long. Please keep it under {max_s} seconds.")]

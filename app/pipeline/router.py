@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.i18n import t
-from app.models import Business, Customer, PendingAction, ProcessedMessage, Transaction
+from app.models import Business, Customer, PendingAction, ProcessedMessage, Transaction, User
 from app.money import fmt_naira
 from app.pipeline.extract import ExtractionFailed, extract
 from app.pipeline.llm import LLMClient, get_llm
@@ -39,7 +39,7 @@ def _fmt_date(iso: str) -> str:
         return iso
 
 
-def confirmation_text(lang: str, v: Validated) -> str:
+def confirmation_text(lang: str, v: Validated, speech_lang: str | None = None) -> str:
     label = t(lang, v.intent)
     out = []
     if v.lines:
@@ -64,6 +64,18 @@ def confirmation_text(lang: str, v: Validated) -> str:
             if v.due_date:
                 money += f" ({t(lang, 'due')} {_fmt_date(v.due_date)})"
         out.append(money)
+
+    # Stricter confirmation for non-supported / beta languages: amounts isolated on their own line
+    if speech_lang:
+        try:
+            from config.languages import is_supported
+            if not is_supported(speech_lang):
+                out.append("")
+                out.append(f"TOTAL AMOUNT: {fmt_naira(v.total_kobo)}")
+                out.append(t(lang, "strict_confirm_amount", amount=fmt_naira(v.total_kobo)))
+        except Exception:
+            pass
+
     return "\n".join(out)
 
 
@@ -87,11 +99,11 @@ def _ask(session, business_id, user_id, text: str, question: str) -> Reply:
     return Reply(question, kind="clarify", pending_id=p.id)
 
 
-def _process(session, business_id, user_id, text, message_id, lang, llm, today) -> list[Reply]:
+def _process(session, business_id, user_id, text, message_id, lang, llm, today, speech_lang: str | None = None) -> list[Reply]:
     biz = session.get(Business, business_id)
     names = list(session.scalars(select(Customer.name).where(Customer.business_id == business_id)))
     try:
-        result = extract(llm, text, lang, [], names, today)
+        result = extract(llm, text, speech_lang or lang, [], names, today)
     except ExtractionFailed:
         return [Reply(t(lang, "try_again"))]
 
@@ -193,13 +205,13 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
         buttons = [(f"save:{p.id}", t(lang, "save")),
                    (f"edit:{p.id}", t(lang, "edit")),
                    (f"cancel:{p.id}", t(lang, "cancel"))]
-        replies.append(Reply(confirmation_text(lang, v), buttons, "confirm", p.id))
+        replies.append(Reply(confirmation_text(lang, v, speech_lang=speech_lang), buttons, "confirm", p.id))
     return replies
 
 
 def handle_text(session: Session, business_id: int, user_id: int, text: str, message_id: str,
                 lang: str = "en", llm: LLMClient | None = None, channel: str = "mock",
-                today: date | None = None, is_voice: bool = False) -> list[Reply]:
+                today: date | None = None, is_voice: bool = False, speech_lang: str | None = None) -> list[Reply]:
     # Same message delivered twice? Ignore the repeat (spec rule 4).
     if session.get(ProcessedMessage, (channel, message_id)) is not None:
         return []
@@ -302,13 +314,49 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return [Reply(msg_profile)]
 
+    # Multi-language command: /language ui <code/name> or /language speech <code/name>
+    if lower in ("/language", "language", "/lang", "lang") or lower.startswith("/language ") or lower.startswith("language "):
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        user = session.get(User, user_id)
+        parts = lower.split()
+        if len(parts) >= 3 and parts[1] in ("ui", "speech"):
+            subcmd, target_code = parts[1], parts[2]
+            from config.languages import LANGUAGES, resolve_ui_language, get_language
+            if subcmd == "ui":
+                resolved = resolve_ui_language(target_code)
+                if user:
+                    user.language = resolved
+                    session.commit()
+                return [Reply(f"UI language updated to {get_language(resolved)['name']}.")]
+            elif subcmd == "speech":
+                if user:
+                    st = dict(user.state_data or {})
+                    st["speech_language"] = target_code
+                    user.state_data = st
+                    session.commit()
+                # If planned language, record demand
+                if target_code not in LANGUAGES or LANGUAGES[target_code].get("level") == "planned":
+                    from app.models import Event
+                    session.add(Event(
+                        business_id=business_id,
+                        user_id=user_id,
+                        name="language_demand",
+                        props={"language": target_code, "action": "set_speech_language"},
+                    ))
+                    session.commit()
+                return [Reply(f"Speech language set to {get_language(target_code)['name']}.")]
+        # Show status
+        current_speech = (user.state_data or {}).get("speech_language", user.language) if user else lang
+        buttons = [("cmd_lang_ui", "Change UI Lang"), ("cmd_lang_speech", "Change Voice Lang")]
+        return [Reply(f"Current Settings:\n- UI Language: {lang}\n- Speech Language: {current_speech}\n\nTo change, send: /language ui <code/name> or /language speech <code/name>", buttons=buttons)]
+
     clarify = _open_clarify(session, business_id, user_id)
     if clarify is not None:  # this message answers our earlier question
         text = f"{clarify.payload['transcript']} {text}"
         clarify.status = "applied"
         session.commit()
 
-    replies = _process(session, business_id, user_id, text, message_id, lang, llm, today)
+    replies = _process(session, business_id, user_id, text, message_id, lang, llm, today, speech_lang=speech_lang)
     session.add(ProcessedMessage(channel=channel, message_id=message_id))
     session.commit()
     return replies

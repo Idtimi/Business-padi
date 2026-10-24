@@ -149,13 +149,40 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
 
     # State: CHOOSE_LANGUAGE
     if user.state == "CHOOSE_LANGUAGE":
+        if btn == "lang:other" or "other" in text.lower():
+            from app.models import Event
+            session.add(Event(
+                user_id=user.id,
+                name="language_demand",
+                props={"source": "onboarding_other_button", "text": text},
+            ))
+            session.commit()
+            prompt = (
+                "Thank you! We don note say you want another language. While we dey work on am, which one you wan use now?"
+                if is_pidgin else
+                "Thank you! We have recorded your interest in additional languages. In the meantime, which would you prefer?"
+            )
+            buttons = [
+                ("lang:pcm", "Nigerian Pidgin"),
+                ("lang:en", "English"),
+            ]
+            return [Reply(prompt, buttons=buttons, kind="confirm")]
+
         chosen_lang = "pcm"
         if btn == "lang:en" or "english" in text.lower() or text.lower() == "en":
             chosen_lang = "en"
         elif btn == "lang:pcm" or "pidgin" in text.lower() or text.lower() == "pcm":
             chosen_lang = "pcm"
+        elif btn.startswith("lang:"):
+            chosen_lang = btn.replace("lang:", "")
+            from config.languages import resolve_ui_language
+            chosen_lang = resolve_ui_language(chosen_lang)
 
         user.language = chosen_lang
+        # Default speech_language matches chosen language
+        state_data = user.state_data or {}
+        state_data["speech_language"] = chosen_lang
+        user.state_data = state_data
         user.state = "CONSENT"
         session.commit()
 

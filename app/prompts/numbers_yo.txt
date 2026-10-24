@@ -1,0 +1,42 @@
+# Yoruba Number Words & Worked Examples (30+ examples)
+# Format: <word form> -> <numeric value>
+
+ookan -> 1
+eeji -> 2
+eeta -> 3
+eerin -> 4
+aarun -> 5
+eefa -> 6
+eeje -> 7
+eejo -> 8
+eesan -> 9
+eewa -> 10
+mokanla -> 11
+mejila -> 12
+medogun -> 15
+ogun -> 20
+ogbon -> 30
+ogoji -> 40
+aadota -> 50
+ogota -> 60
+aadorin -> 70
+ogorin -> 80
+aadorun -> 90
+ogorun -> 100
+igba -> 200
+eegberun -> 1000
+eegberun meji -> 2000
+eegberun marun -> 5000
+eegberun mewaa -> 10000
+eegberun medogun -> 15000
+eegberun ogun -> 20000
+eegberun ogbon -> 30000
+eegberun ogoji -> 40000
+eegberun aadota -> 50000
+eegberun ogota -> 60000
+eegberun ogorin -> 80000
+eegberun ogorun -> 100000
+aadota egberun -> 50000
+egberun lona ogorun -> 100000
+adota egbere -> 50000
+miliunu kan -> 1000000

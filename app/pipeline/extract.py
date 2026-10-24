@@ -14,6 +14,13 @@ class ExtractionFailed(Exception):
 
 def build_system_prompt(today: date, language: str, known_items, known_customers) -> str:
     text = PROMPT_PATH.read_text(encoding="utf-8")
+    try:
+        from app.pipeline.numbers import get_number_few_shots
+        few_shots = get_number_few_shots(language, limit=10)
+        if few_shots:
+            text += f"\n\nNumber words reference for {language}:\n{few_shots}"
+    except Exception:
+        pass
     # plain replace (not .format) because the prompt is full of { } from the JSON shape
     return (text.replace("{today}", today.isoformat())
                 .replace("{language}", language)

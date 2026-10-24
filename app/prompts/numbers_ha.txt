@@ -1,0 +1,38 @@
+# Hausa Number Words & Worked Examples (30+ examples)
+# Format: <word form> -> <numeric value>
+
+daya -> 1
+biyu -> 2
+uku -> 3
+hudu -> 4
+biyar -> 5
+shida -> 6
+bakwai -> 7
+takwas -> 8
+tara -> 9
+goma -> 10
+sha daya -> 11
+sha biyu -> 12
+sha biyar -> 15
+ashirin -> 20
+ashirin da biyar -> 25
+talatin -> 30
+arba'in -> 40
+hamsin -> 50
+sittin -> 60
+tasa'in -> 90
+dari -> 100
+dari biyu -> 200
+dari biyar -> 500
+dubu -> 1000
+dubu biyu -> 2000
+dubu biyar -> 5000
+dubu goma -> 10000
+dubu sha biyar -> 15000
+dubu ashirin -> 20000
+dubu ashirin da biyar -> 25000
+dubu talatin -> 30000
+dubu arba'in da biyu da dari biyar -> 42500
+dubu hamsin -> 50000
+dubu dari -> 100000
+miliyan daya -> 1000000

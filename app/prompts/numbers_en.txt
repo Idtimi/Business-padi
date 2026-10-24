@@ -1,0 +1,41 @@
+# English Number Words & Worked Examples (30+ examples)
+# Format: <word form> -> <numeric value>
+
+one -> 1
+two -> 2
+three -> 3
+four -> 4
+five -> 5
+six -> 6
+seven -> 7
+eight -> 8
+nine -> 9
+ten -> 10
+eleven -> 11
+twelve -> 12
+fifteen -> 15
+twenty -> 20
+twenty-five -> 25
+thirty -> 30
+forty -> 40
+forty-two -> 42
+fifty -> 50
+sixty -> 60
+seventy -> 70
+eighty -> 80
+ninety -> 90
+one hundred -> 100
+two hundred -> 200
+five hundred -> 500
+one thousand -> 1000
+two thousand -> 2000
+five thousand -> 5000
+ten thousand -> 10000
+fifteen thousand -> 15000
+twenty thousand -> 20000
+twenty-five thousand -> 25000
+thirty thousand -> 30000
+forty-two thousand five hundred -> 42500
+fifty thousand -> 50000
+one hundred thousand -> 100000
+one million -> 1000000
