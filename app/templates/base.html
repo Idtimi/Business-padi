@@ -4,59 +4,449 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Shop Dashboard{% endblock %} - Business Padi</title>
+
+    <!-- Official Brand Deck Google Fonts (Lato for Headlines, Nunito Sans for Body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@700;900&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --primary: #0b8457;
-            --primary-hover: #086341;
-            --bg: #f8fafc;
-            --card-bg: #ffffff;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --danger: #dc2626;
-            --warning: #d97706;
-            --success: #16a34a;
-            --info: #2563eb;
+            /* Official Business Padi Color Palette */
+            --padi-navy: #0D1F45;
+            --padi-orange: #FF6A13;
+            --padi-orange-hover: #E55909;
+            --padi-sunshine: #FFC233;
+            --padi-deep-orange: #C24A06;
+            --padi-cream: #FFF6EC;
+            --padi-mist: #F1F4F9;
+            --padi-white: #FFFFFF;
+            
+            /* Semantic aliases */
+            --primary: var(--padi-orange);
+            --primary-hover: var(--padi-orange-hover);
+            --navy: var(--padi-navy);
+            --bg: var(--padi-mist);
+            --card-bg: #FFFFFF;
+            --text-main: #0D1F45;
+            --text-muted: #5A6B87;
+            --border: #E2E8F0;
+            --danger: #DC2626;
+            --warning: #D97706;
+            --success: #16A34A;
+            --info: #2563EB;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background-color: var(--bg); color: var(--text-main); line-height: 1.5; }
-        .navbar { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
-        .nav-brand { font-size: 1.25rem; font-weight: 700; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; }
-        .nav-links { display: flex; gap: 1rem; align-items: center; }
-        .nav-link { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.6rem; border-radius: 4px; transition: all 0.2s; }
-        .nav-link:hover, .nav-link.active { color: var(--primary); background: #e8f5e9; }
-        .badge { display: inline-block; padding: 0.2rem 0.5rem; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; text-transform: uppercase; }
-        .badge-starter { background: #e2e8f0; color: #475569; }
-        .badge-solo { background: #fef3c7; color: #92400e; }
-        .badge-trader { background: #dbeafe; color: #1e40af; }
-        .badge-business { background: #dcfce7; color: #166534; }
-        .badge-success { background: #dcfce7; color: #166534; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-danger { background: #fee2e2; color: #991b1b; }
-        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
-        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-        .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
-        .stat-title { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; }
-        .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text-main); margin-top: 0.25rem; }
-        .stat-desc { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
-        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600; border-radius: 6px; text-decoration: none; cursor: pointer; border: none; transition: background 0.2s; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
-        .btn-outline:hover { background: #f1f5f9; }
-        .btn-sm { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
-        .table-responsive { width: 100%; overflow-x: auto; margin-top: 1rem; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-        th { background: #f8fafc; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 600; }
-        td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
-        tr:hover td { background: #f8fafc; }
-        .filters-form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
-        .form-control { padding: 0.45rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; }
-        .actions-cell { display: flex; gap: 0.5rem; }
-        @media (max-width: 768px) {
-            .navbar { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
-            .nav-links { flex-wrap: wrap; width: 100%; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        h1, h2, h3, h4, h5, .brand-font {
+            font-family: 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-weight: 700;
+            color: var(--padi-navy);
+        }
+
+        /* Top Brand Navigation Bar */
+        .navbar {
+            background: var(--padi-navy);
+            border-bottom: 2px solid rgba(255, 106, 19, 0.3);
+            padding: 0.75rem 1.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 4px 12px rgba(13, 31, 69, 0.15);
+        }
+
+        .nav-brand-group {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            text-decoration: none;
+        }
+
+        .brand-logo-mark {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .brand-text {
+            font-family: 'Lato', sans-serif;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: white;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-text span {
+            color: var(--padi-orange);
+            font-weight: 900;
+        }
+
+        .shop-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.3rem 0.75rem;
+            border-radius: 9999px;
+            color: #E2E8F0;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .shop-pill strong {
+            color: #FFFFFF;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 0.4rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: #C5D2E8;
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 600;
+            padding: 0.45rem 0.75rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover {
+            color: #FFFFFF;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .nav-link.active {
+            color: #FFFFFF;
+            background: var(--padi-orange);
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(255, 106, 19, 0.35);
+        }
+
+        .nav-link.logout {
+            color: #FCA5A5;
+            margin-left: 0.5rem;
+        }
+
+        .nav-link.logout:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #FEE2E2;
+        }
+
+        /* Plan & Status Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.65rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-starter {
+            background: #E2E8F0;
+            color: #475569;
+        }
+
+        .badge-solo {
+            background: var(--padi-cream);
+            color: var(--padi-deep-orange);
+            border: 1px solid #FED7AA;
+        }
+
+        .badge-trader {
+            background: #EFF6FF;
+            color: #1E40AF;
+            border: 1px solid #BFDBFE;
+        }
+
+        .badge-business {
+            background: var(--padi-navy);
+            color: var(--padi-sunshine);
+            border: 1px solid var(--padi-sunshine);
+        }
+
+        .badge-success {
+            background: #DCFCE7;
+            color: #166534;
+        }
+
+        .badge-warning {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .badge-danger {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        /* Layout & Cards */
+        .container {
+            max-width: 1220px;
+            margin: 2rem auto;
+            padding: 0 1.25rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.75rem;
+            margin-bottom: 1.75rem;
+            box-shadow: 0 3px 8px rgba(13, 31, 69, 0.04), 0 1px 3px rgba(13, 31, 69, 0.02);
+            transition: box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 6px 14px rgba(13, 31, 69, 0.06);
+        }
+
+        /* Dashboard Statistics Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.35rem;
+            box-shadow: 0 2px 4px rgba(13, 31, 69, 0.03);
+            border-left: 4px solid var(--padi-orange);
+        }
+
+        .stat-card.stat-navy {
+            border-left-color: var(--padi-navy);
+        }
+
+        .stat-card.stat-sunshine {
+            border-left-color: var(--padi-sunshine);
+        }
+
+        .stat-card.stat-success {
+            border-left-color: var(--success);
+        }
+
+        .stat-card.stat-danger {
+            border-left-color: var(--danger);
+        }
+
+        .stat-title {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-family: 'Lato', sans-serif;
+            font-size: 1.85rem;
+            font-weight: 900;
+            color: var(--padi-navy);
+            margin-top: 0.35rem;
+        }
+
+        .stat-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.35rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            padding: 0.55rem 1.15rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            border-radius: 8px;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(13, 31, 69, 0.05);
+        }
+
+        .btn-primary {
+            background: var(--padi-orange);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--padi-orange-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(255, 106, 19, 0.25);
+        }
+
+        .btn-navy {
+            background: var(--padi-navy);
+            color: white;
+        }
+
+        .btn-navy:hover {
+            background: #182F5F;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(13, 31, 69, 0.2);
+        }
+
+        .btn-sunshine {
+            background: var(--padi-sunshine);
+            color: var(--padi-navy);
+        }
+
+        .btn-sunshine:hover {
+            background: #F59E0B;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--padi-navy);
+        }
+
+        .btn-outline:hover {
+            background: #F8FAFC;
+            border-color: #CBD5E1;
+        }
+
+        .btn-sm {
+            padding: 0.3rem 0.65rem;
+            font-size: 0.8rem;
+            border-radius: 6px;
+        }
+
+        /* Data Tables */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.92rem;
+            background: white;
+        }
+
+        th {
+            background: #F8FAFC;
+            padding: 0.85rem 1rem;
+            border-bottom: 2px solid var(--border);
+            color: var(--padi-navy);
+            font-weight: 700;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid #F1F4F9;
+            color: var(--text-main);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: #FFFBF7;
+        }
+
+        /* Inputs & Forms */
+        .filters-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .form-control {
+            padding: 0.55rem 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-family: inherit;
+            color: var(--text-main);
+            background: white;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--padi-orange);
+            box-shadow: 0 0 0 3px rgba(255, 106, 19, 0.15);
+        }
+
+        .actions-cell {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .navbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.85rem;
+                padding: 1rem;
+            }
+            .nav-brand-group {
+                justify-content: space-between;
+            }
+            .nav-links {
+                flex-wrap: wrap;
+                width: 100%;
+                gap: 0.3rem;
+            }
+            .nav-link {
+                font-size: 0.82rem;
+                padding: 0.35rem 0.55rem;
+            }
         }
     </style>
     {% block extra_head %}{% endblock %}
@@ -64,10 +454,29 @@
 <body>
     {% if business %}
     <nav class="navbar">
-        <a href="/d" class="nav-brand">
-            🏪 {{ business.name or "My Shop" }}
-            <span class="badge badge-{{ business.plan or 'starter' }}">{{ business.plan or 'starter' }}</span>
-        </a>
+        <div class="nav-brand-group">
+            <a href="/d" class="nav-brand">
+                <!-- Precision SVG Brand Mark from Guidelines -->
+                <div class="brand-logo-mark">
+                    <svg viewBox="0 0 100 95" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+                        <path d="M22 10C56 10 78 22 78 45C78 65 58 74 36 74L36 84C36 89.5 31.5 94 26 94C20.5 94 16 89.5 16 84L16 24C16 16.3 22 10 26 10H22Z" fill="#FF6A13"/>
+                        <rect x="34" y="28" width="26" height="32" rx="13" fill="#0D1F45"/>
+                        <rect x="39" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+                        <rect x="45.4" y="33" width="3.2" height="22" rx="1.6" fill="#FF6A13"/>
+                        <rect x="51.8" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+                        <circle cx="82" cy="18" r="8" fill="#FFC233"/>
+                    </svg>
+                </div>
+                <div class="brand-text">Business <span>Padi</span></div>
+            </a>
+
+            <div class="shop-pill">
+                <span>🏪</span>
+                <strong>{{ business.name or "My Shop" }}</strong>
+                <span class="badge badge-{{ business.plan or 'starter' }}">{{ business.plan or 'starter' }}</span>
+            </div>
+        </div>
+
         <div class="nav-links">
             <a href="/d" class="nav-link {% if active_page == 'overview' %}active{% endif %}">Overview</a>
             <a href="/d/ledger" class="nav-link {% if active_page == 'ledger' %}active{% endif %}">Ledger</a>
@@ -78,7 +487,7 @@
             <a href="/d/reports" class="nav-link {% if active_page == 'reports' %}active{% endif %}">Reports</a>
             <a href="/d/profile" class="nav-link {% if active_page == 'profile' %}active{% endif %}">Profile</a>
             <a href="/d/billing" class="nav-link {% if active_page == 'billing' %}active{% endif %}">Plans & Billing</a>
-            <a href="/d/logout" class="nav-link" style="color: var(--danger);">Logout</a>
+            <a href="/d/logout" class="nav-link logout">Logout</a>
         </div>
     </nav>
     {% endif %}

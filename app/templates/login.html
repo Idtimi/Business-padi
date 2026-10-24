@@ -3,39 +3,209 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Login - Business Padi</title>
+    <title>Web Dashboard Login - Business Padi</title>
+
+    <!-- Official Brand Deck Google Fonts (Lato & Nunito Sans) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@700;900&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --primary: #0b8457;
-            --primary-hover: #086341;
-            --bg: #f8fafc;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --danger: #dc2626;
+            --padi-navy: #0D1F45;
+            --padi-orange: #FF6A13;
+            --padi-orange-hover: #E55909;
+            --padi-sunshine: #FFC233;
+            --padi-deep-orange: #C24A06;
+            --padi-cream: #FFF6EC;
+            --padi-mist: #F1F4F9;
+            --padi-border: #E2E8F0;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background: var(--bg); color: var(--text-main); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem 1rem; }
-        .card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 2.5rem 2rem; max-width: 480px; width: 100%; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07); }
-        .brand { font-size: 1.6rem; font-weight: 800; color: var(--primary); text-align: center; margin-bottom: 0.25rem; }
-        .subtitle { text-align: center; color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem; }
-        .alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; margin-bottom: 1.5rem; text-align: center; }
-        .btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.95rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: all 0.2s; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn-outline { background: white; border: 1px solid var(--border); color: var(--text-main); }
-        .btn-outline:hover { background: #f1f5f9; }
-        .form-control { width: 100%; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; margin-bottom: 1rem; }
-        .divider { display: flex; align-items: center; text-align: center; margin: 1.75rem 0; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; }
-        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--padi-mist);
+            color: var(--padi-navy);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1.5rem 1rem;
+        }
+
+        .login-card {
+            background: white;
+            border: 1px solid var(--padi-border);
+            border-radius: 16px;
+            padding: 2.75rem 2.25rem;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 10px 25px -5px rgba(13, 31, 69, 0.08), 0 8px 10px -6px rgba(13, 31, 69, 0.03);
+            text-align: center;
+        }
+
+        /* App Icon Tile from Brand Deck */
+        .app-icon-tile {
+            width: 72px;
+            height: 72px;
+            background: var(--padi-navy);
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 4px 12px rgba(13, 31, 69, 0.2);
+        }
+
+        .brand-title {
+            font-family: 'Lato', sans-serif;
+            font-size: 1.85rem;
+            font-weight: 700;
+            color: var(--padi-navy);
+            letter-spacing: -0.02em;
+        }
+
+        .brand-title span {
+            color: var(--padi-orange);
+            font-weight: 900;
+        }
+
+        .brand-tagline {
+            font-size: 0.92rem;
+            color: #5A6B87;
+            margin-top: 0.25rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .alert-error {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #991B1B;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0.8rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--padi-orange);
+            color: white;
+            box-shadow: 0 2px 4px rgba(255, 106, 19, 0.2);
+        }
+
+        .btn-primary:hover {
+            background: var(--padi-orange-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(255, 106, 19, 0.3);
+        }
+
+        .btn-navy {
+            background: var(--padi-navy);
+            color: white;
+        }
+
+        .btn-navy:hover {
+            background: #182F5F;
+            transform: translateY(-1px);
+        }
+
+        .btn-outline {
+            background: white;
+            border: 1px solid var(--padi-border);
+            color: var(--padi-navy);
+        }
+
+        .btn-outline:hover {
+            background: #F8FAFC;
+            border-color: #CBD5E1;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--padi-border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            margin-bottom: 1rem;
+            color: var(--padi-navy);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--padi-orange);
+            box-shadow: 0 0 0 3px rgba(255, 106, 19, 0.15);
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 1.75rem 0;
+            color: #8E9BAE;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--padi-border);
+        }
+
         .divider::before { margin-right: 0.75em; }
         .divider::after { margin-left: 0.75em; }
+
+        .demo-box {
+            background: var(--padi-cream);
+            border: 1px solid #FED7AA;
+            border-radius: 12px;
+            padding: 1.35rem 1.25rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <div class="card">
-        <div class="brand">🏪 Business Padi</div>
-        <div class="subtitle">Trader Web Dashboard Login</div>
+    <div class="login-card">
+        <!-- Brand Deck Official App Icon -->
+        <div class="app-icon-tile">
+            <svg viewBox="0 0 100 95" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 48px; height: 48px;">
+                <path d="M22 10C56 10 78 22 78 45C78 65 58 74 36 74L36 84C36 89.5 31.5 94 26 94C20.5 94 16 89.5 16 84L16 24C16 16.3 22 10 26 10H22Z" fill="#FF6A13"/>
+                <rect x="34" y="28" width="26" height="32" rx="13" fill="#0D1F45"/>
+                <rect x="39" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+                <rect x="45.4" y="33" width="3.2" height="22" rx="1.6" fill="#FF6A13"/>
+                <rect x="51.8" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+                <circle cx="82" cy="18" r="8" fill="#FFC233"/>
+            </svg>
+        </div>
+
+        <div class="brand-title">Business <span>Padi</span></div>
+        <p class="brand-tagline">The business friend that listens.</p>
 
         {% if error %}
         <div class="alert-error">
@@ -43,37 +213,37 @@
         </div>
         {% endif %}
 
-        <!-- Direct 1-Click Demo Login for Evaluation -->
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; text-align: center;">
-            <div style="font-size: 0.85rem; font-weight: 700; color: #166534; text-transform: uppercase; margin-bottom: 0.25rem;">
-                🏆 Instant Evaluation Access
+        <!-- Direct 1-Click Evaluation Access -->
+        <div class="demo-box">
+            <div style="font-size: 0.78rem; font-weight: 800; color: var(--padi-deep-orange); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem;">
+                🏆 Live Judging & Evaluation Demo
             </div>
-            <p style="font-size: 0.85rem; color: #15803d; margin-bottom: 1rem;">
-                Explore Mama Ngozi Provisions with all live ledger, stock, documents, and billing data loaded.
+            <p style="font-size: 0.85rem; color: #5A6B87; margin-bottom: 1rem; line-height: 1.4;">
+                Instant access to <strong>Mama Ngozi Provisions</strong> with complete ledger, stock, receipts, and staff permissions.
             </p>
             <form action="/d/login/demo" method="POST">
-                <button type="submit" class="btn btn-primary" style="background: #16a34a; font-size: 1rem;">
-                    🚀 Enter Mama Ngozi Provisions (Live Demo)
+                <button type="submit" class="btn btn-primary">
+                    🚀 Launch Live Demo (1-Click)
                 </button>
             </form>
         </div>
 
-        <div class="divider">OR LOG IN WITH YOUR PHONE</div>
+        <div class="divider">OR LOG IN WITH PHONE</div>
 
         <!-- Phone Number Login -->
-        <form action="/d/login/phone" method="POST">
-            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-main);">
-                Shop Owner WhatsApp Phone Number
+        <form action="/d/login/phone" method="POST" style="text-align: left;">
+            <label style="display: block; font-size: 0.82rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--padi-navy); text-transform: uppercase; letter-spacing: 0.04em;">
+                Shop Owner WhatsApp Number
             </label>
-            <input type="text" name="phone" class="form-control" placeholder="e.g. +234 810 159 3645 or 08011223344" required>
-            <button type="submit" class="btn btn-outline" style="border-color: var(--primary); color: var(--primary); font-weight: 700;">
+            <input type="text" name="phone" class="form-control" placeholder="+234 810 159 3645 or 08011223344" required>
+            <button type="submit" class="btn btn-navy">
                 Log In to My Shop
             </button>
         </form>
 
-        <div class="divider">WHATSAPP MAGIC LINK</div>
-        <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; line-height: 1.4;">
-            You can also send <strong>"dashboard"</strong> in WhatsApp to our bot number to receive a direct 15-minute magic link.
+        <div class="divider">WHATSAPP CHAT ACCESS</div>
+        <p style="color: #64748b; font-size: 0.84rem; line-height: 1.4;">
+            Send <strong>"dashboard"</strong> on WhatsApp to our bot to receive an instant direct magic link.
         </p>
     </div>
 </body>

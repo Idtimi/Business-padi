@@ -3,77 +3,131 @@
 {% block title %}Shop Overview{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+<!-- Top Header & Actions -->
+<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
     <div>
-        <h1 style="font-size: 1.5rem; font-weight: 700;">Welcome back, {{ user.display_name or "Shop Owner" }}!</h1>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Here is your shop's performance for today ({{ metrics.date_str }}).</p>
+        <h1 style="font-size: 1.65rem; font-weight: 800; color: var(--padi-navy); letter-spacing: -0.02em;">
+            Welcome back, {{ user.display_name or "Shop Owner" }}! 👋
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">
+            Here is your live shop summary for today &bull; <strong>{{ metrics.date_str }}</strong>
+        </p>
     </div>
-    <div style="display: flex; gap: 0.5rem;">
-        <a href="/d/ledger/export.csv" class="btn btn-outline">📥 Export Ledger CSV</a>
-        <a href="/d/ledger" class="btn btn-primary">View Full Ledger</a>
+    <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+        <a href="/d/ledger/export.csv" class="btn btn-outline">
+            📥 Export CSV
+        </a>
+        <a href="/d/reports/pnl.pdf" class="btn btn-navy" target="_blank">
+            📊 Download P&L Report
+        </a>
+        <a href="/d/ledger" class="btn btn-primary">
+            View Full Ledger &rarr;
+        </a>
     </div>
 </div>
 
+<!-- Quick Navigation Bar for Live Demo -->
+<div class="card" style="padding: 1rem 1.25rem; margin-bottom: 1.75rem; background: #FFFFFF; border-left: 4px solid var(--padi-orange);">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.25rem;">⚡</span>
+            <span style="font-weight: 700; color: var(--padi-navy); font-size: 0.92rem;">Quick Operations:</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <a href="/d/documents" class="btn btn-outline btn-sm">📄 View Receipts & Invoices</a>
+            <a href="/d/customers" class="btn btn-outline btn-sm">👥 Debtor Statements</a>
+            <a href="/d/stock" class="btn btn-outline btn-sm">📦 Check Stock Balances</a>
+            <a href="/d/staff" class="btn btn-outline btn-sm">🎟️ Staff & Invites</a>
+            <a href="/d/billing" class="btn btn-outline btn-sm" style="border-color: var(--padi-orange); color: var(--padi-deep-orange);">⭐ Plans & Tiers</a>
+        </div>
+    </div>
+</div>
+
+<!-- Key Performance Metrics Grid -->
 <div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-title">Today's Sales</div>
-        <div class="stat-value">{{ metrics.today_sales_kobo | fmt_naira }}</div>
-        <div class="stat-desc">{{ metrics.today_sales_count }} sales recorded today</div>
+    <div class="stat-card stat-navy">
+        <div class="stat-title">Today's Total Sales</div>
+        <div class="stat-value" style="color: var(--padi-navy);">
+            {{ metrics.today_sales_kobo | fmt_naira }}
+        </div>
+        <div class="stat-desc">
+            <strong>{{ metrics.today_sales_count }}</strong> confirmed sales today
+        </div>
     </div>
-    <div class="stat-card">
-        <div class="stat-title">Total Money Owed</div>
-        <div class="stat-value" style="color: var(--warning);">{{ metrics.total_owed_kobo | fmt_naira }}</div>
-        <div class="stat-desc">Across {{ metrics.debtor_count }} debtors</div>
+
+    <div class="stat-card stat-sunshine">
+        <div class="stat-title">Customer Debts (Credit Book)</div>
+        <div class="stat-value" style="color: var(--padi-deep-orange);">
+            {{ metrics.total_owed_kobo | fmt_naira }}
+        </div>
+        <div class="stat-desc">
+            Owed across <strong>{{ metrics.debtor_count }}</strong> active debtors
+        </div>
     </div>
-    <div class="stat-card">
-        <div class="stat-title">Low Stock Items</div>
-        <div class="stat-value" {% if metrics.low_stock_count > 0 %}style="color: var(--danger);"{% endif %}>
+
+    <div class="stat-card {% if metrics.low_stock_count > 0 %}stat-danger{% else %}stat-success{% endif %}">
+        <div class="stat-title">Inventory Alerts</div>
+        <div class="stat-value" {% if metrics.low_stock_count > 0 %}style="color: var(--danger);"{% else %}style="color: var(--success);"{% endif %}>
             {{ metrics.low_stock_count }}
         </div>
         <div class="stat-desc">
             {% if not metrics.has_stock_plan %}
                 <span class="badge badge-starter">Stock plan required</span>
             {% elif metrics.low_stock_count > 0 %}
-                Items need restock
+                Items below reorder threshold
             {% else %}
-                All items healthy
+                All tracked inventory healthy
             {% endif %}
         </div>
     </div>
 </div>
 
+<!-- Recent Transactions Feed -->
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2 style="font-size: 1.15rem; font-weight: 600;">Recent Transactions</h2>
-        <a href="/d/ledger" class="btn btn-outline btn-sm">See All &rarr;</a>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div>
+            <h2 style="font-size: 1.2rem; font-weight: 700; color: var(--padi-navy);">Recent Transactions</h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">Voice & text entries processed in real time</p>
+        </div>
+        <a href="/d/ledger" class="btn btn-outline btn-sm">See Full History &rarr;</a>
     </div>
 
     <div class="table-responsive">
         <table>
             <thead>
                 <tr>
-                    <th>Date</th>
-                    <th>Kind</th>
+                    <th>Time / Date</th>
+                    <th>Type</th>
                     <th>Customer / Supplier</th>
-                    <th>Total</th>
-                    <th>Paid</th>
-                    <th>Status</th>
+                    <th>Total Amount</th>
+                    <th>Paid Amount</th>
+                    <th>Verification</th>
                 </tr>
             </thead>
             <tbody>
                 {% if recent_txs %}
                     {% for tx in recent_txs %}
                     <tr>
-                        <td>{{ tx.created_at[:16] }}</td>
-                        <td><span class="badge badge-starter">{{ tx.kind }}</span></td>
-                        <td>{{ tx.customer_name or "-" }}</td>
-                        <td style="font-weight: 600;">{{ tx.total_kobo | fmt_naira }}</td>
-                        <td>{{ tx.paid_kobo | fmt_naira }}</td>
+                        <td style="color: var(--text-muted); font-size: 0.85rem;">{{ tx.created_at[:16] }}</td>
+                        <td>
+                            <span class="badge {% if tx.kind == 'sale' %}badge-solo{% elif tx.kind == 'expense' %}badge-danger{% elif tx.kind == 'payment_received' %}badge-success{% else %}badge-starter{% endif %}">
+                                {{ tx.kind }}
+                            </span>
+                        </td>
+                        <td style="font-weight: 700; color: var(--padi-navy);">
+                            {{ tx.customer_name or "-" }}
+                        </td>
+                        <td style="font-weight: 800; color: var(--padi-navy);">
+                            {{ tx.total_kobo | fmt_naira }}
+                        </td>
+                        <td>
+                            {{ tx.paid_kobo | fmt_naira }}
+                        </td>
                         <td>
                             {% if tx.status == 'confirmed' %}
-                                <span class="badge badge-success">confirmed</span>
+                                <span class="badge badge-success">✓ Confirmed</span>
                             {% elif tx.status == 'pending' %}
-                                <span class="badge badge-warning">pending</span>
+                                <span class="badge badge-warning">⏳ Pending Approval</span>
                             {% else %}
                                 <span class="badge badge-danger">{{ tx.status }}</span>
                             {% endif %}
@@ -82,7 +136,9 @@
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No transactions recorded yet. Record via WhatsApp voice note or text!</td>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+                            No transactions recorded yet. Send a voice note or text to start recording!
+                        </td>
                     </tr>
                 {% endif %}
             </tbody>
