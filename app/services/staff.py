@@ -220,6 +220,97 @@ def remove_staff_member(session: Session, business_id: int, staff_user_id: int, 
     return True
 
 
+def add_staff_member(
+    session: Session,
+    business_id: int,
+    actor_user_id: int,
+    phone: str,
+    name: str = "",
+    role: str = "attendant",
+    can_issue_invoices: bool = False,
+    can_see_profit: bool = False,
+) -> Staff:
+    """Directly add or update a staff member for the business (enforces plan seat limits)."""
+    biz = session.get(Business, business_id)
+    if biz is None:
+        raise ValueError(f"Business {business_id} not found")
+
+    if not is_owner(session, business_id, actor_user_id):
+        raise PermissionError("Only the shop owner can add staff members.")
+
+    plan_def = plans.get_plan(biz.plan)
+    max_seats = plan_def.staff_accounts
+    if max_seats <= 0:
+        raise ValueError(
+            f"Staff accounts require the Business plan ({plan_def.name} plan has 0 staff seats). "
+            "Please upgrade your plan to add staff."
+        )
+
+    phone_clean = phone.strip()
+    if not phone_clean:
+        raise ValueError("Phone number is required.")
+
+    # Find or create user for this staff member
+    user = session.scalar(
+        select(User).where(User.channel == "whatsapp", User.channel_user_id == phone_clean)
+    )
+    if user is None:
+        user = User(
+            channel="whatsapp",
+            channel_user_id=phone_clean,
+            display_name=name.strip() or f"Attendant {phone_clean[-4:]}",
+            state="DONE",
+            consent_at=now_iso(),
+        )
+        session.add(user)
+        session.flush()
+    elif name.strip():
+        user.display_name = name.strip()
+
+    # Check active seats count
+    existing_staff = session.scalar(
+        select(Staff).where(
+            Staff.business_id == business_id,
+            Staff.user_id == user.id,
+        )
+    )
+
+    if existing_staff is None or existing_staff.active == 0:
+        active_staff_count = session.scalar(
+            select(func.count())
+            .select_from(Staff)
+            .where(
+                Staff.business_id == business_id,
+                Staff.active == 1,
+            )
+        ) or 0
+        if active_staff_count >= max_seats:
+            raise ValueError(f"Seat limit of {max_seats} staff reached for your {plan_def.name} plan.")
+
+    if existing_staff is None:
+        st = Staff(
+            business_id=business_id,
+            user_id=user.id,
+            role=role,
+            can_issue_invoices=1 if can_issue_invoices else 0,
+            can_see_profit=1 if can_see_profit else 0,
+            active=1,
+        )
+        session.add(st)
+        session.flush()
+    else:
+        st = existing_staff
+        st.role = role
+        st.can_issue_invoices = 1 if can_issue_invoices else 0
+        st.can_see_profit = 1 if can_see_profit else 0
+        st.active = 1
+        session.flush()
+
+    log_audit(session, business_id, actor_user_id, "add_staff", f"{user.display_name} ({phone_clean})")
+    session.commit()
+    return st
+
+
 def get_approval_threshold_kobo(session: Session, business_id: int) -> int:
     """Retrieve the business's large transaction approval threshold."""
     biz = session.get(Business, business_id)

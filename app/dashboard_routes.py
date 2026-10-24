@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, Form, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -26,7 +26,7 @@ from app.models import (
     get_tz,
 )
 from app.money import fmt_naira
-from app.services import billing, dashboard, documents, ledger, plans, reports
+from app.services import billing, dashboard, documents, ledger, plans, reports, staff
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -514,7 +514,7 @@ def staff_page(
             "display_name": u.display_name if u else None,
             "phone": u.channel_user_id if u else "Unknown",
             "role": st.role,
-            "can_view_reports": bool(st.can_view_reports),
+            "can_view_reports": bool(st.can_see_profit),
             "can_issue_invoices": bool(st.can_issue_invoices),
             "active": bool(st.active),
         })
@@ -526,6 +526,9 @@ def staff_page(
     plan_def = PLANS.get(biz.plan or "starter")
     max_staff = plan_def.staff_accounts if plan_def else 0
 
+    message = request.query_params.get("message")
+    error = request.query_params.get("error")
+
     return templates.TemplateResponse(
         request,
         "staff.html",
@@ -536,8 +539,104 @@ def staff_page(
             "invites": invites,
             "max_staff": max_staff,
             "active_page": "staff",
+            "message": message,
+            "error": error,
         },
     )
+
+
+@router.post("/staff/invite")
+def create_staff_invite_route(
+    role: str = Form("attendant"),
+    can_issue_invoices: str | None = Form(None),
+    can_see_profit: str | None = Form(None),
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    try:
+        inv = staff.create_invite(
+            db,
+            biz.id,
+            user.id,
+            role=role,
+            can_issue_invoices=bool(can_issue_invoices),
+            can_see_profit=bool(can_see_profit),
+        )
+        db.commit()
+        return RedirectResponse(
+            url=f"/d/staff?message=Invite+code+{inv.code}+created+successfully!+Valid+for+24+hours.",
+            status_code=303,
+        )
+    except Exception as e:
+        return RedirectResponse(
+            url=f"/d/staff?error={str(e)}",
+            status_code=303,
+        )
+
+
+@router.post("/staff/add")
+def add_staff_member_route(
+    name: str = Form(...),
+    phone: str = Form(...),
+    role: str = Form("attendant"),
+    can_issue_invoices: str | None = Form(None),
+    can_see_profit: str | None = Form(None),
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    try:
+        st = staff.add_staff_member(
+            db,
+            biz.id,
+            user.id,
+            phone=phone,
+            name=name,
+            role=role,
+            can_issue_invoices=bool(can_issue_invoices),
+            can_see_profit=bool(can_see_profit),
+        )
+        return RedirectResponse(
+            url=f"/d/staff?message=Staff+member+{name or phone}+added+successfully!",
+            status_code=303,
+        )
+    except Exception as e:
+        return RedirectResponse(
+            url=f"/d/staff?error={str(e)}",
+            status_code=303,
+        )
+
+
+@router.post("/staff/{staff_id}/toggle")
+def toggle_staff_status_route(
+    staff_id: int,
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    st = db.get(Staff, staff_id)
+    if st and st.business_id == biz.id:
+        st.active = 0 if st.active == 1 else 1
+        action = "revoke_staff" if st.active == 0 else "restore_staff"
+        staff.log_audit(db, biz.id, user.id, action, f"staff_id:{st.id}")
+        db.commit()
+    return RedirectResponse(url="/d/staff", status_code=303)
+
+
+@router.post("/invites/{invite_id}/delete")
+def delete_invite_route(
+    invite_id: int,
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    inv = db.get(Invite, invite_id)
+    if inv and inv.business_id == biz.id:
+        db.delete(inv)
+        staff.log_audit(db, biz.id, user.id, "cancel_invite", f"invite:{inv.code}")
+        db.commit()
+    return RedirectResponse(url="/d/staff", status_code=303)
 
 
 @router.get("/reports", response_class=HTMLResponse)

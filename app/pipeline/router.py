@@ -263,6 +263,34 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return [Reply(f"Added +25 voice entries! Total extra entries this month: {extra}.")]
 
+    # Staff Join with Code (e.g. "JOIN-A1B2C3" or "join A1B2C3")
+    if lower.startswith("join-") or (lower.startswith("join ") and len(lower.split()) == 2):
+        from app.services import staff
+        code_part = stripped if lower.startswith("join-") else f"JOIN-{stripped.split(None, 1)[1]}"
+        ok, msg, _ = staff.join_business_with_code(session, user_id, code_part)
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return [Reply(msg)]
+
+    # Staff Invite command (e.g. "invite staff", "add staff")
+    if lower in ("/invite staff", "invite staff", "/invite_staff", "invite_staff", "add staff", "/add staff") and biz:
+        from app.services import staff
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        try:
+            inv = staff.create_invite(session, business_id, user_id, role="attendant")
+            msg = (
+                f"Staff invite created!\n\n"
+                f"Invite Code: *{inv.code}*\n"
+                f"Expires in 24 hours.\n\n"
+                f"Share this code with your shop attendant. When they message this bot and send:\n"
+                f"*{inv.code}*\n"
+                f"they will be added to your team!"
+            )
+            return [Reply(msg)]
+        except Exception as e:
+            return [Reply(str(e))]
+
     # Reminder text commands (remind now, pause, stop, resume)
     from app.services import reminders
     rem_resp = reminders.handle_reminder_text_command(session, business_id, text, lang)

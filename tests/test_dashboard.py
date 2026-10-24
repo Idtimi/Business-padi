@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 import app.models as m
@@ -232,3 +232,44 @@ def test_plan_gating_stock_and_staff(db_session):
     resp_staff_biz = client.get("/d/staff")
     assert resp_staff_biz.status_code == 200
     assert "Team Members" in resp_staff_biz.text
+
+
+def test_staff_dashboard_management_actions(db_session):
+    """Test generating invite, directly adding staff, and toggling status from dashboard."""
+    session, _ = db_session
+    user, biz = make_test_shop(session, "Mega Store", plan="business")
+    cookie = dashboard.create_session_cookie(user.id, biz.id)
+    client = TestClient(app, cookies={"vl_session": cookie})
+
+    # 1. Generate an invite code
+    resp_inv = client.post("/d/staff/invite", data={"role": "attendant", "can_issue_invoices": "1"}, follow_redirects=True)
+    assert resp_inv.status_code == 200
+    assert "JOIN-" in resp_inv.text
+
+    # 2. Add staff member directly
+    resp_add = client.post(
+        "/d/staff/add",
+        data={
+            "name": "Chika Attendant",
+            "phone": "+2348011223344",
+            "role": "attendant",
+            "can_issue_invoices": "1",
+            "can_see_profit": "1",
+        },
+        follow_redirects=True,
+    )
+    assert resp_add.status_code == 200
+    assert "Chika Attendant" in resp_add.text
+    assert "Revoke" in resp_add.text
+
+    # 3. Revoke staff member
+    staff_row = session.scalar(select(m.Staff).where(m.Staff.business_id == biz.id))
+    assert staff_row is not None
+    assert staff_row.active == 1
+
+    resp_toggle = client.post(f"/d/staff/{staff_row.id}/toggle", follow_redirects=True)
+    assert resp_toggle.status_code == 200
+    assert "Re-activate" in resp_toggle.text
+    session.refresh(staff_row)
+    assert staff_row.active == 0
+
