@@ -272,7 +272,11 @@ def update_delivery_status(session: Session, status_dict: dict) -> WaMessageLog 
     if log_entry is not None:
         log_entry.status = status_str
         session.commit()
-        log.info("Updated message %s delivery status to %s", wa_mid, status_str)
+        errors = status_dict.get("errors")
+        if errors:
+            log.warning("Message %s failed delivery. Error details: %s", wa_mid, errors)
+        else:
+            log.info("Updated message %s delivery status to %s", wa_mid, status_str)
         return log_entry
 
     return None

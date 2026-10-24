@@ -84,7 +84,7 @@ def login_page(request: Request, token: str | None = None, db: Session = Depends
             key=dashboard.SESSION_COOKIE_NAME,
             value=cookie,
             httponly=True,
-            path="/d",
+            path="/",
             samesite="lax",
         )
         return resp

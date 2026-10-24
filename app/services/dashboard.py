@@ -179,7 +179,7 @@ def get_overview_metrics(session: Session, business_id: int, today_date=None) ->
             select(StockItem).where(StockItem.business_id == business_id)
         ).all()
         for item in items:
-            if item.reorder_level is not None and item.qty_on_hand <= item.reorder_level:
+            if item.low_at is not None and item.qty <= item.low_at:
                 low_stock_count += 1
                 low_stock_items.append(item)
 
