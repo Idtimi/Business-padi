@@ -235,6 +235,14 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return [Reply(f"Added +25 voice entries! Total extra entries this month: {extra}.")]
 
+    # Reminder text commands (remind now, pause, stop, resume)
+    from app.services import reminders
+    rem_resp = reminders.handle_reminder_text_command(session, business_id, text, lang)
+    if rem_resp is not None:
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return [Reply(rem_resp)]
+
     clarify = _open_clarify(session, business_id, user_id)
     if clarify is not None:  # this message answers our earlier question
         text = f"{clarify.payload['transcript']} {text}"

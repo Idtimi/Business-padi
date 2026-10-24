@@ -128,6 +128,11 @@ def confirm(session: Session, business_id: int, pending_id: int) -> Transaction:
 
     if data["intent"] == "payment_received" and customer is not None:
         _allocate_payment(session, business_id, customer.id, data["total_kobo"], data["source_msg_id"])
+        from app.services import reminders
+        reminders.sync_reminders_after_payment(session, business_id, customer.id)
+    elif tx.kind == "sale" and tx.due_date and tx.paid_kobo < tx.total_kobo and customer is not None:
+        from app.services import reminders
+        reminders.schedule_reminders_for_sale(session, business_id, customer.id, tx.id, tx.due_date)
 
     p.status = "applied"
     session.commit()
