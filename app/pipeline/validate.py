@@ -26,6 +26,8 @@ class Validated:
     due_date: str | None = None
     category: str | None = None
     payment: str | None = None
+    query: dict | None = None
+    correction: dict | None = None
     problems: list[str] = field(default_factory=list)  # questions to ask the trader
 
     @property
@@ -62,10 +64,16 @@ def validate(x: Extracted) -> Validated:
         due_date=x.due_date,
         category=x.category,
         payment=x.payment,
+        query=x.query,
+        correction=x.correction,
     )
 
     if x.needs_clarification:
         v.problems.append(x.needs_clarification)
+        return v
+
+    # Pass through query and correction intents without demanding line items or amounts
+    if x.intent in {"query", "correction", "chitchat", "unknown"}:
         return v
 
     # Total: sum of lines, or the single amount if there are no items

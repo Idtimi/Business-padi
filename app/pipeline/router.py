@@ -10,7 +10,7 @@ from app.money import fmt_naira
 from app.pipeline.extract import ExtractionFailed, extract
 from app.pipeline.llm import LLMClient, get_llm
 from app.pipeline.validate import Validated, validate
-from app.services import ledger, pending
+from app.services import ledger, pending, reports
 
 
 @dataclass
@@ -97,6 +97,23 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
             continue
         if v.intent == "chitchat":
             continue  # no filler messages (they cost money)
+        if v.intent == "query":
+            q_info = v.query or {}
+            qtype = q_info.get("type", "total_owed")
+            params = q_info.get("params", {})
+            ans = reports.run_query(session, business_id, qtype, params, lang, today, llm=llm)
+            replies.append(Reply(ans, kind="info"))
+            continue
+        if v.intent == "correction":
+            corr = v.correction or {}
+            try:
+                p, reply_text = ledger.propose_correction(session, business_id, user_id, corr, text, f"{message_id}#{i}", lang)
+                buttons = [(f"save:{p.id}", t(lang, "save")),
+                           (f"cancel:{p.id}", t(lang, "cancel"))]
+                replies.append(Reply(reply_text, buttons, "confirm", p.id))
+            except ValueError as e:
+                replies.append(Reply(str(e), kind="info"))
+            continue
         if v.intent not in ledger.SAVEABLE:
             replies.append(Reply(t(lang, "not_yet")))
             continue
@@ -145,7 +162,11 @@ def _saved_text(session, business_id, tx, lang) -> str:
 def handle_button(session: Session, business_id: int, user_id: int, action: str,
                   pending_id: int, lang: str = "en") -> list[Reply]:
     try:
+        p = pending.get_for_business(session, business_id, pending_id)
         if action == "save":
+            if p.kind == "correction":
+                tx = ledger.confirm_correction(session, business_id, pending_id)
+                return [Reply(_saved_text(session, business_id, tx, lang))]
             tx = ledger.confirm(session, business_id, pending_id)
             return [Reply(_saved_text(session, business_id, tx, lang))]
         if action == "cancel":

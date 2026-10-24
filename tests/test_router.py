@@ -114,7 +114,8 @@ def test_question_is_not_saved_as_a_transaction(session):
     u, b = make_business(session)
     replies = router.handle_text(session, b.id, u.id, "How I sell this week?", "m1", "en", llm=MockLLM())
     assert len(replies) == 1 and replies[0].kind == "info"
-    assert replies[0].text == t("en", "not_yet")
+    assert "Sales" in replies[0].text
+    assert count(session, m.Transaction) == 0
     assert count(session, m.PendingAction) == 0
 
 

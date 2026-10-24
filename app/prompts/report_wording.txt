@@ -1,0 +1,4 @@
+Rewrite the facts below as a short friendly message (max 5 lines) in {language}.
+Use simple words a market trader understands. Copy every number exactly as given.
+Do not add numbers, advice or facts that are not in the data.
+Data: {facts_json}

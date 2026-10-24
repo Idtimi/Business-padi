@@ -25,6 +25,15 @@ class MockLLM:
         found = self.cases.get(user.strip().lower())
         if found is not None:
             return found
+        user_norm = user.strip().lower().rstrip("?.,!")
+        if "who owe me pass" in user_norm:
+            return {
+                "language_detected": "pidgin",
+                "transactions": [{
+                    "intent": "query",
+                    "query": {"type": "top_debtor", "params": {}},
+                }],
+            }
         return {
             "language_detected": "unknown",
             "transactions": [{
