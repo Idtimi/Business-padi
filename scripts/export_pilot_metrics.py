@@ -1,4 +1,4 @@
-"""Export pilot metrics per Part H of VoiceLedger specification.
+"""Export pilot metrics per Part H of BusinessPadi specification.
 
 Calculates:
 - Active traders per day & week-one retention
@@ -196,7 +196,7 @@ def export_pilot_metrics(output_csv: str = "pilot_metrics.csv"):
             writer.writerow([day, active, counts.get("voice_entry", 0), counts.get("confirm_save", 0), counts.get("confirm_edit", 0)])
 
     print(f"\n=======================================================")
-    print(f"       VOICELEDGER PILOT METRICS (PART H)             ")
+    print(f"       BUSINESSPADI PILOT METRICS (PART H)             ")
     print(f"=======================================================")
     print(f"Total Traders Onboarded:       {metrics['total_traders']}")
     print(f"Week-1 Retention:              {metrics['w1_retention_pct']:.1f}%")
@@ -212,7 +212,7 @@ def export_pilot_metrics(output_csv: str = "pilot_metrics.csv"):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Export VoiceLedger Part H pilot metrics")
+    parser = argparse.ArgumentParser(description="Export BusinessPadi Part H pilot metrics")
     parser.add_argument("--output", type=str, default="pilot_metrics.csv", help="Output CSV path")
     args = parser.parse_args()
 

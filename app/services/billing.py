@@ -1,6 +1,6 @@
 """Billing service: plan activation, test-mode billing, packs, and status.
 
-Per Phase 6 of the Voice-to-Ledger specification:
+Per Phase 6 of the Business Padi specification:
 - Manual "activate plan" admin command
 - Test-mode flag (no live payment provider yet)
 - Entry pack purchases (+25 voice entries)

@@ -1,6 +1,6 @@
 """Debt reminders service: scheduling, dispatch, trader-forwarding links, and controls.
 
-Per Phase 7 of the Voice-to-Ledger specification:
+Per Phase 7 of the Business Padi specification:
 - Generates reminder schedules for credit sales with a due date:
   * 1 day before (gentle)
   * on the day (gentle)

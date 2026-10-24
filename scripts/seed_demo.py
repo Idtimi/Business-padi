@@ -1,4 +1,4 @@
-"""Seed script to populate a realistic demo merchant business for VoiceLedger.
+"""Seed script to populate a realistic demo merchant business for BusinessPadi.
 
 Creates:
 - Demo Business: "Mama Ngozi Provisions" (Trader plan)
@@ -359,7 +359,7 @@ def seed_demo_data(reset: bool = True):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Seed realistic demo data for VoiceLedger")
+    parser = argparse.ArgumentParser(description="Seed realistic demo data for BusinessPadi")
     parser.add_argument("--no-reset", action="store_true", help="Do not wipe existing demo data")
     args = parser.parse_args()
 

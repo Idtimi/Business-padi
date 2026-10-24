@@ -38,7 +38,7 @@ def save_and_resize_logo(image_bytes: bytes, business_id: int, max_size=(512, 51
 def help_menu(lang: str = "en") -> str:
     if lang == "pcm":
         return (
-            "Voice-to-Ledger Help:\n"
+            "Business Padi Help:\n"
             "- Record sale: 'I sell 3 bags rice to Mama Ngozi, 40k each, cash'\n"
             "- Record expense: 'Today I buy fuel 5000 naira'\n"
             "- Customer payment: 'Mama Ngozi don pay 20,000'\n"
@@ -48,7 +48,7 @@ def help_menu(lang: str = "en") -> str:
             "- You fit talk voice note or type am."
         )
     return (
-        "Voice-to-Ledger Help:\n"
+        "Business Padi Help:\n"
         "- Record sale: 'I sold 3 bags of rice to John, 40k each, cash'\n"
         "- Record expense: 'Bought generator fuel for 5,000 naira'\n"
         "- Customer repayment: 'John paid 20,000'\n"
@@ -136,9 +136,9 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         user.state = "CHOOSE_LANGUAGE"
         session.commit()
         welcome = (
-            "Welcome to Voice-to-Ledger. Abeg choose your language:"
+            "Welcome to Business Padi. Abeg choose your language:"
             if is_pidgin else
-            "Welcome to Voice-to-Ledger. Choose your language:"
+            "Welcome to Business Padi. Choose your language:"
         )
         buttons = [
             ("lang:pcm", "Nigerian Pidgin"),

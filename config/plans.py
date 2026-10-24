@@ -1,6 +1,6 @@
 """Plan definitions, entitlements, caps, and pricing matrix.
 
-Per Part A and Part M of the Voice-to-Ledger specification.
+Per Part A and Part M of the Business Padi specification.
 All monetary amounts are integer kobo.
 """
 

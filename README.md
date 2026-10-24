@@ -1,4 +1,4 @@
-# Voice-to-Ledger (Smart Challenge 3rd Edition)
+# Business Padi (Smart Challenge 3rd Edition)
 
 AI-powered voice & text bookkeeping on WhatsApp for Nigerian traders and MSMEs.
 Built with FastAPI, SQLAlchemy, SQLite/PostgreSQL, Meta WhatsApp Cloud API, and ReportLab.
@@ -67,14 +67,14 @@ To transition from Meta developer sandbox to live production with real Nigerian 
 - [ ] Verify phone number or official domain email via OTP. Wait for Meta approval status (**Verified**).
 
 ### 2. Display Name Review & Approval
-- [ ] Under **WhatsApp** > **Phone Numbers** in Meta Business Manager, request your official WhatsApp Display Name (e.g. `Voice Ledger` or trader brand).
+- [ ] Under **WhatsApp** > **Phone Numbers** in Meta Business Manager, request your official WhatsApp Display Name (e.g. `Business Padi` or trader brand).
 - [ ] Ensure the display name strictly complies with [Meta Display Name Guidelines](https://www.facebook.com/business/help/529612240925342):
   - Must have a direct relationship to your legal business or brand.
   - Must not contain generic words alone, punctuation, or all-caps unless trademarked.
 - [ ] Wait for Meta automated or manual certificate review until status changes to **Approved**.
 
 ### 3. Permanent System-User Access Token
-- [ ] In **Business Settings** > **Users** > **System Users**, create a new System User with the **Admin** role (e.g., `VoiceLedgerBot`).
+- [ ] In **Business Settings** > **Users** > **System Users**, create a new System User with the **Admin** role (e.g., `BusinessPadiBot`).
 - [ ] Under **Assigned Assets**, grant access to your WhatsApp Business Account (WABA) with **Full Control**.
 - [ ] Generate a new token with permanent (never-expiring) lifetime.
 - [ ] Select required permissions:
@@ -132,26 +132,26 @@ The application includes a production-ready `Dockerfile` based on `python:3.12-s
 
 1. **Build Container Image**:
    ```bash
-   docker build -t voice-ledger:latest .
+   docker build -t business-padi:latest .
    ```
 
 2. **Run Container**:
    ```bash
    docker run -d \
-     --name voice-ledger \
+     --name business-padi \
      -p 8000:8000 \
      -e DATABASE_URL=sqlite:///./data/ledger.db \
      -e APP_ENV=production \
-     -v voice_ledger_data:/app/data \
-     voice-ledger:latest
+     -v business_padi_data:/app/data \
+     business-padi:latest
    ```
 
 3. **Health & Readiness Endpoints**:
-   - `GET /health`: Liveness probe returning `{"status": "ok", "app": "voice-ledger"}`.
+   - `GET /health`: Liveness probe returning `{"status": "ok", "app": "business-padi"}`.
    - `GET /ready`: Readiness probe verifying database connectivity `{"status": "ready", "database": "connected"}`.
 
 ### Offline Demo Mode
-VoiceLedger can be run 100% offline without internet access or live Meta/ASR API credentials:
+BusinessPadi can be run 100% offline without internet access or live Meta/ASR API credentials:
 
 1. **Enable Demo Mode in `.env` or Environment**:
    ```ini

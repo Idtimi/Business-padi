@@ -1,4 +1,4 @@
-"""Query and reporting services for Voice-to-Ledger.
+"""Query and reporting services for Business Padi.
 
 Handles business queries computed directly in Python:
 - total_owed: total debt across all customers

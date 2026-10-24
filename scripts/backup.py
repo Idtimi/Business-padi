@@ -93,7 +93,7 @@ def run_backup(keep: int = 7, backup_dir: str = "backups") -> Path:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="VoiceLedger database backup utility")
+    parser = argparse.ArgumentParser(description="BusinessPadi database backup utility")
     parser.add_argument("--keep", type=int, default=7, help="Number of recent backups to keep")
     parser.add_argument("--dir", type=str, default="backups", help="Target backup directory")
     args = parser.parse_args()

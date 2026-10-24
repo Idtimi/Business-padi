@@ -153,11 +153,11 @@ def test_help_menu_in_chosen_language(factory):
 
         # English user asks help
         asyncio.run(handle_incoming(channel, make_msg(user_ref_en, text="help", mid="h1"), s))
-        assert "Voice-to-Ledger Help:" in channel.sent[-1]["text"]
+        assert "Business Padi Help:" in channel.sent[-1]["text"]
 
         # Pidgin user asks help
         asyncio.run(handle_incoming(channel, make_msg(user_ref_pcm, text="help", mid="h2"), s))
-        assert "Voice-to-Ledger Help:" in channel.sent[-1]["text"]
+        assert "Business Padi Help:" in channel.sent[-1]["text"]
         assert "You fit talk voice note" in channel.sent[-1]["text"]
 
 

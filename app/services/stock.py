@@ -1,6 +1,6 @@
 """Stock tracking service: inventory, unit conversions, moves, and supplier pricing.
 
-Per Phase 8 of the Voice-to-Ledger specification:
+Per Phase 8 of the Business Padi specification:
 - Item matching with aliases and fuzzy matching.
 - Unit conversions (e.g. 1 carton = 24 sachets).
 - Restocks update weighted average cost and supplier price memory.

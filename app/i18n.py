@@ -1,4 +1,4 @@
-"""Multi-language UI strings and translation resolution for VoiceLedger.
+"""Multi-language UI strings and translation resolution for BusinessPadi.
 
 Rules:
 - Unreviewed languages (ui_reviewed=False) fall back to English/Pidgin.

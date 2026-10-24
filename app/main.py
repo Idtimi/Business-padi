@@ -13,7 +13,7 @@ from app.whatsapp_routes import router as whatsapp_router
 setup_logging()
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Voice-to-Ledger")
+app = FastAPI(title="Business Padi")
 app.include_router(whatsapp_router)
 app.include_router(dashboard_router, prefix="/d")
 app.include_router(profile_router)

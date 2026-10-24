@@ -518,7 +518,7 @@ def generate_profile_pdf(session: Session, business_id: int, consent_id: int | N
     elements.append(Spacer(1, 16))
     elements.append(HRFlowable(width="100%", thickness=0.5, color=muted_color, spaceAfter=8))
     elements.append(Paragraph(
-        "CONFIDENTIAL &bull; Generated via Voice Ledger &bull; Aggregated Metrics Only &bull; Contains No Individual Customer Data",
+        "CONFIDENTIAL &bull; Generated via Business Padi &bull; Aggregated Metrics Only &bull; Contains No Individual Customer Data",
         subtitle_style,
     ))
 

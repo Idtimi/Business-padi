@@ -1,4 +1,4 @@
-"""Language registry and support levels for VoiceLedger.
+"""Language registry and support levels for BusinessPadi.
 
 Support levels:
 - untested: Not yet measured; treated like beta until tests are run.

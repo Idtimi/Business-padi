@@ -1,6 +1,6 @@
 """Staff, roles, permissions, and transaction approvals service.
 
-Per Phase 10 of the Voice-to-Ledger specification:
+Per Phase 10 of the Business Padi specification:
 - One-time expiring invite codes for staff onboarding.
 - Staff role permissions (cannot see profit or reports unless granted,
   cannot cancel or edit records without owner approval, cannot issue invoices unless allowed).

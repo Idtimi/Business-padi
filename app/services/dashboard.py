@@ -34,7 +34,7 @@ DEFAULT_SESSION_HOURS = 24
 
 
 def _get_secret() -> str:
-    return settings.whatsapp_app_secret or "voice-ledger-secret-key-12345"
+    return settings.whatsapp_app_secret or "business-padi-secret-key-12345"
 
 
 def generate_magic_link(session: Session, user_id: int, business_id: int,
