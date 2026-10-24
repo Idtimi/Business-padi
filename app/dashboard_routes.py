@@ -367,13 +367,13 @@ def documents_page(
                 cust_name = c.name
         doc_list.append({
             "id": d.id,
-            "doc_number": d.doc_number,
+            "doc_number": d.number,
             "kind": d.kind,
             "customer_name": cust_name,
             "total_kobo": d.total_kobo,
-            "issued_at": d.issued_at,
+            "issued_at": d.created_at,
             "status": d.status,
-            "pdf_path": d.pdf_path,
+            "pdf_path": d.file_path,
         })
 
     return templates.TemplateResponse(
@@ -399,13 +399,48 @@ def download_document_pdf(
     if doc is None or doc.business_id != biz.id:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    if not doc.pdf_path or not os.path.exists(doc.pdf_path):
-        raise HTTPException(status_code=404, detail="PDF file not found on disk.")
+    if not doc.file_path or not os.path.exists(doc.file_path):
+        # Generate on-the-fly if disk file missing
+        cust = db.get(Customer, doc.customer_id) if doc.customer_id else None
+        tx = db.get(Transaction, doc.transaction_id) if doc.transaction_id else None
+        items = (tx.items_json if tx and tx.items_json else [
+            {"name": "Items recorded", "qty": 1, "unit": "pkg", "unit_price_kobo": doc.total_kobo, "line_total_kobo": doc.total_kobo}
+        ])
+        paid = tx.paid_kobo if tx else (doc.total_kobo if doc.kind == "receipt" else 0)
+        bal = max(0, doc.total_kobo - paid)
+
+        pdf_bytes = documents.render_pdf_bytes(
+            business_name=biz.name,
+            business_address=biz.address,
+            business_phone=biz.phone,
+            business_bank=biz.bank_details,
+            business_footer=getattr(biz, "footer_text", None),
+            brand_color=getattr(biz, "brand_color", None),
+            logo_path=getattr(biz, "logo_path", None),
+            doc_kind=doc.kind,
+            doc_number=doc.number,
+            doc_date=doc.created_at[:10] if doc.created_at else "2026-10-24",
+            customer_name=cust.name if cust else None,
+            customer_phone=cust.phone if cust else None,
+            items=items,
+            total_kobo=doc.total_kobo,
+            paid_kobo=paid,
+            balance_kobo=bal,
+        )
+        if doc.file_path:
+            os.makedirs(os.path.dirname(doc.file_path), exist_ok=True)
+            with open(doc.file_path, "wb") as f:
+                f.write(pdf_bytes)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{doc.number}.pdf"'},
+        )
 
     return FileResponse(
-        doc.pdf_path,
+        doc.file_path,
         media_type="application/pdf",
-        filename=f"{doc.doc_number}.pdf",
+        filename=f"{doc.number}.pdf",
     )
 
 
@@ -512,7 +547,53 @@ def reports_page(
     db: Session = Depends(get_db),
 ):
     user, biz = auth
-    summary = reports.generate_evening_summary(db, biz.id)
+    # All confirmed sales
+    sales_txs = list(db.scalars(select(Transaction).where(
+        Transaction.business_id == biz.id,
+        Transaction.kind == "sale",
+        Transaction.status == "confirmed",
+    )))
+    sales_kobo = sum(t.total_kobo for t in sales_txs)
+    sales_count = len(sales_txs)
+
+    # Cash collected (cash sales + payments)
+    cash_sales = sum(t.paid_kobo for t in sales_txs)
+    payments = list(db.scalars(select(Payment).where(
+        Payment.business_id == biz.id,
+    )))
+    cash_collected_kobo = cash_sales + sum(p.amount_kobo for p in payments)
+
+    # Expenses
+    exp_txs = list(db.scalars(select(Transaction).where(
+        Transaction.business_id == biz.id,
+        Transaction.kind == "expense",
+        Transaction.status == "confirmed",
+    )))
+    expenses_kobo = sum(t.total_kobo for t in exp_txs)
+    expenses_count = len(exp_txs)
+
+    # Profit estimate
+    profit_data = reports.profit_estimate(db, biz.id, "all") if hasattr(reports, "profit_estimate") else None
+    net_profit_kobo = profit_data.get("profit_kobo", sales_kobo - expenses_kobo) if isinstance(profit_data, dict) else (sales_kobo - expenses_kobo)
+
+    # Top debtors list
+    customers = list(db.scalars(select(Customer).where(Customer.business_id == biz.id)))
+    debtors = []
+    for c in customers:
+        bal = ledger.customer_balance_kobo(db, biz.id, c.id)
+        if bal > 0:
+            debtors.append({"id": c.id, "name": c.name, "phone": c.phone, "balance_kobo": bal})
+    debtors.sort(key=lambda d: d["balance_kobo"], reverse=True)
+
+    summary = {
+        "sales_kobo": sales_kobo,
+        "sales_count": sales_count,
+        "cash_collected_kobo": cash_collected_kobo,
+        "expenses_kobo": expenses_kobo,
+        "expenses_count": expenses_count,
+        "net_profit_kobo": net_profit_kobo,
+        "top_debtors": debtors[:10],
+    }
 
     return templates.TemplateResponse(
         request,
@@ -533,7 +614,7 @@ def download_pnl_pdf(
 ):
     user, biz = auth
     today_dt = datetime.now(get_tz()).date()
-    pdf_path = reports.generate_pnl_pdf(db, biz.id, target_date=today_dt)
+    pdf_path = reports.generate_pnl_pdf(db, biz.id, period="this_month", today=today_dt)
     if not pdf_path or not os.path.exists(pdf_path):
         raise HTTPException(status_code=500, detail="P&L statement PDF generation failed.")
 
