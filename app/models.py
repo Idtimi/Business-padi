@@ -205,6 +205,7 @@ class UsageCounter(Base):
     business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"), primary_key=True)
     month: Mapped[str] = mapped_column(String, primary_key=True)
     voice_entries: Mapped[int] = mapped_column(Integer, default=0)
+    extra_entries: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class UsageLog(Base):

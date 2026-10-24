@@ -10,7 +10,7 @@ from app.money import fmt_naira
 from app.pipeline.extract import ExtractionFailed, extract
 from app.pipeline.llm import LLMClient, get_llm
 from app.pipeline.validate import Validated, validate
-from app.services import documents, ledger, pending, reports
+from app.services import billing, documents, ledger, pending, plans, reports
 
 
 @dataclass
@@ -22,8 +22,13 @@ class Reply:
 
 
 def parse_button(button_id: str) -> tuple[str, int]:
-    action, pid = button_id.split(":")
-    return action, int(pid)
+    if ":" in button_id:
+        action, pid_str = button_id.split(":", 1)
+        try:
+            return action, int(pid_str)
+        except ValueError:
+            return action, 0
+    return button_id, 0
 
 
 def _fmt_date(iso: str) -> str:
@@ -83,6 +88,7 @@ def _ask(session, business_id, user_id, text: str, question: str) -> Reply:
 
 
 def _process(session, business_id, user_id, text, message_id, lang, llm, today) -> list[Reply]:
+    biz = session.get(Business, business_id)
     names = list(session.scalars(select(Customer.name).where(Customer.business_id == business_id)))
     try:
         result = extract(llm, text, lang, [], names, today)
@@ -114,7 +120,16 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
             except ValueError as e:
                 replies.append(Reply(str(e), kind="info"))
             continue
-        if v.intent in {"receipt", "invoice"}:
+        if v.intent in {"receipt", "invoice", "quote", "quotation"}:
+            doc_kind = "invoice" if v.intent == "invoice" else ("quote" if v.intent in ("quote", "quotation") else "receipt")
+            feature_name = "invoices" if doc_kind == "invoice" else ("quotations" if doc_kind == "quote" else "receipts")
+
+            # Check plan entitlements
+            if not plans.allowed(biz, feature_name):
+                prompt_text, buttons = plans.upgrade_prompt_for_feature(feature_name, lang)
+                replies.append(Reply(prompt_text, buttons=buttons, kind="info"))
+                continue
+
             cust = ledger.get_or_create_customer(session, business_id, v.customer)
             tx = None
             if not v.lines and v.total_kobo <= 0:
@@ -136,9 +151,9 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
                 paid_kobo = v.paid_kobo
 
             cust_name = session.get(Customer, cust_id).name if cust_id else (v.customer or "Customer")
-            preview = f"Issue {v.intent.title()} for {cust_name}: {fmt_naira(tot_kobo)}"
+            preview = f"Issue {doc_kind.title()} for {cust_name}: {fmt_naira(tot_kobo)}"
             payload = {
-                "kind": v.intent,
+                "kind": doc_kind,
                 "customer_id": cust_id,
                 "items": items,
                 "total_kobo": tot_kobo,
@@ -146,7 +161,7 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
                 "transaction_id": tx.id if tx else None,
                 "due_date": v.due_date,
             }
-            p = pending.create(session, business_id, user_id, f"issue_{v.intent}", payload)
+            p = pending.create(session, business_id, user_id, f"issue_{doc_kind}", payload)
             session.commit()
             buttons = [(f"issue:{p.id}", "Issue"), (f"cancel:{p.id}", t(lang, "cancel"))]
             replies.append(Reply(preview, buttons=buttons, kind="confirm", pending_id=p.id))
@@ -168,11 +183,57 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
 
 def handle_text(session: Session, business_id: int, user_id: int, text: str, message_id: str,
                 lang: str = "en", llm: LLMClient | None = None, channel: str = "mock",
-                today: date | None = None) -> list[Reply]:
+                today: date | None = None, is_voice: bool = False) -> list[Reply]:
     # Same message delivered twice? Ignore the repeat (spec rule 4).
     if session.get(ProcessedMessage, (channel, message_id)) is not None:
         return []
     llm = llm or get_llm()
+
+    biz = session.get(Business, business_id)
+
+    # Entitlement check for voice entry quota
+    if is_voice and biz:
+        allowed_v, cur_u, cap = plans.can_use_voice_entry(session, biz)
+        if not allowed_v:
+            text_prompt, buttons = plans.upgrade_prompt_for_voice_quota(cur_u, cap, biz.plan, lang)
+            return [Reply(text_prompt, buttons=buttons, kind="info")]
+        plans.increment_voice_usage(session, business_id)
+
+    # Billing & Plan text commands
+    stripped = text.strip()
+    lower = stripped.lower()
+    if lower in ("/plan", "plan", "/plans", "plans", "/billing", "billing") and biz:
+        status = billing.get_billing_status(session, biz)
+        msg_text, buttons = billing.format_plan_status_message(status, lang)
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return [Reply(msg_text, buttons=buttons)]
+
+    if (lower.startswith("/upgrade") or lower.startswith("upgrade ")) and biz:
+        parts = lower.split()
+        target_plan = parts[1] if len(parts) > 1 else "trader"
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        try:
+            b = billing.activate_plan(session, business_id, target_plan)
+            return [Reply(f"Plan upgraded to {b.plan.title()} successfully!")]
+        except ValueError as e:
+            return [Reply(str(e))]
+
+    if (lower.startswith("/downgrade") or lower.startswith("downgrade ")) and biz:
+        parts = lower.split()
+        target_plan = parts[1] if len(parts) > 1 else "starter"
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        try:
+            b = billing.downgrade_plan(session, business_id, target_plan)
+            return [Reply(f"Plan downgraded to {b.plan.title()}. Historical documents and records remain preserved.")]
+        except ValueError as e:
+            return [Reply(str(e))]
+
+    if lower in ("/buy_pack", "buy_pack", "buy pack", "/buy pack") and biz:
+        extra = billing.buy_entry_pack(session, business_id)
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return [Reply(f"Added +25 voice entries! Total extra entries this month: {extra}.")]
 
     clarify = _open_clarify(session, business_id, user_id)
     if clarify is not None:  # this message answers our earlier question
@@ -197,7 +258,51 @@ def _saved_text(session, business_id, tx, lang) -> str:
 
 
 def handle_button(session: Session, business_id: int, user_id: int, action: str,
-                  pending_id: int, lang: str = "en") -> list[Reply]:
+                  pending_id: int = 0, lang: str = "en") -> list[Reply]:
+    # Billing & Plan button actions
+    if action == "upgrade_trader":
+        billing.activate_plan(session, business_id, "trader")
+        msg = ("Your account has been upgraded to the Trader plan (₦5,000/month)!"
+               if lang != "pcm" else "Your account don upgrade to Trader plan (₦5,000/month)!")
+        return [Reply(msg)]
+
+    if action == "upgrade_business":
+        billing.activate_plan(session, business_id, "business")
+        msg = ("Your account has been upgraded to the Business plan (₦15,000/month)!"
+               if lang != "pcm" else "Your account don upgrade to Business plan (₦15,000/month)!")
+        return [Reply(msg)]
+
+    if action == "buy_pack":
+        extra = billing.buy_entry_pack(session, business_id)
+        msg = (f"Added +25 voice entries for this month! Total extra entries: {extra}."
+               if lang != "pcm" else f"We don add +25 voice notes for dis month! Extra notes now: {extra}.")
+        return [Reply(msg)]
+
+    if action == "view_plans":
+        biz = session.get(Business, business_id)
+        if biz:
+            status = billing.get_billing_status(session, biz)
+            text, buttons = billing.format_plan_status_message(status, lang)
+            return [Reply(text, buttons=buttons)]
+        return [Reply("Shop not found.")]
+
+    if action == "send_receipt":
+        tx = ledger.get_last_transaction(session, business_id)
+        if tx is None:
+            return [Reply("No recent sale found to create receipt.")]
+        doc = documents.issue_document(
+            session=session,
+            business_id=business_id,
+            kind="receipt",
+            transaction_id=tx.id,
+            customer_id=tx.customer_id,
+            items=tx.items_json or [],
+            total_kobo=tx.total_kobo,
+            paid_kobo=tx.paid_kobo,
+        )
+        link = documents.wa_me_link(None, f"Receipt #{doc.number}: {fmt_naira(doc.total_kobo)}")
+        return [Reply(f"Receipt #{doc.number} issued ({fmt_naira(doc.total_kobo)}).\nForward link: {link}")]
+
     try:
         p = pending.get_for_business(session, business_id, pending_id)
         if action in {"save", "issue"}:

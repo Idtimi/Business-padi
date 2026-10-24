@@ -60,7 +60,7 @@ async def _handle_voice(channel: Channel, session: Session, biz: Business | None
             return [router.Reply("Please complete shop setup first.")]
 
         return router.handle_text(session, biz.id, user.id, transcript.text,
-                                  msg.message_id, user.language, channel=msg.channel)
+                                  msg.message_id, user.language, channel=msg.channel, is_voice=True)
     except AudioTooLong:
         max_s = settings.max_voice_seconds
         return [router.Reply(f"Voice note too long. Please keep it under {max_s} seconds.")]

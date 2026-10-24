@@ -41,6 +41,13 @@ class MockLLM:
                     "intent": "receipt",
                 }],
             }
+        if "send invoice" in user_norm or "invoice for that sale" in user_norm or "create invoice" in user_norm:
+            return {
+                "language_detected": "english",
+                "transactions": [{
+                    "intent": "invoice",
+                }],
+            }
         return {
             "language_detected": "unknown",
             "transactions": [{
