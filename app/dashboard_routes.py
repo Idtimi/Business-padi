@@ -417,11 +417,47 @@ def download_customer_statement(
         raise HTTPException(status_code=404, detail="Customer not found.")
 
     doc = documents.issue_customer_statement(db, biz.id, cust.id)
-    if not doc.pdf_path or not os.path.exists(doc.pdf_path):
-        raise HTTPException(status_code=500, detail="Statement PDF generation failed.")
+    if not doc.file_path or not os.path.exists(doc.file_path):
+        # Render on the fly via ReportLab fallback
+        bal = ledger.customer_balance_kobo(db, biz.id, cust.id)
+        sales = list(db.scalars(select(Transaction).where(
+            Transaction.business_id == biz.id,
+            Transaction.customer_id == cust.id,
+            Transaction.kind == "sale",
+            Transaction.status == "confirmed",
+        ).order_by(Transaction.created_at.asc())))
+        items = [{"name": f"Sale #{s.id} ({s.created_at[:10]})", "qty": 1, "unit": "", "unit_price_kobo": s.total_kobo, "line_total_kobo": s.total_kobo} for s in sales] or [{"name": "Account Balance", "qty": 1, "unit": "", "unit_price_kobo": bal, "line_total_kobo": bal}]
+        paid = sum(s.paid_kobo for s in sales)
+        pdf_bytes = documents.render_pdf_bytes(
+            business_name=biz.name,
+            business_address=biz.address,
+            business_phone=biz.phone,
+            business_bank=biz.bank_details,
+            business_footer=getattr(biz, "footer_text", None),
+            brand_color=getattr(biz, "brand_color", None),
+            logo_path=getattr(biz, "logo_path", None),
+            doc_kind="statement",
+            doc_number=doc.number,
+            doc_date=doc.created_at[:10] if doc.created_at else "2026-10-24",
+            customer_name=cust.name,
+            customer_phone=cust.phone,
+            items=items,
+            total_kobo=doc.total_kobo,
+            paid_kobo=paid,
+            balance_kobo=bal,
+        )
+        if doc.file_path:
+            os.makedirs(os.path.dirname(doc.file_path), exist_ok=True)
+            with open(doc.file_path, "wb") as f:
+                f.write(pdf_bytes)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="statement_{cust.name}.pdf"'},
+        )
 
     return FileResponse(
-        doc.pdf_path,
+        doc.file_path,
         media_type="application/pdf",
         filename=f"statement_{cust.name}.pdf",
     )
