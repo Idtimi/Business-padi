@@ -107,10 +107,19 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
             q_info = v.query or {}
             qtype = q_info.get("type", "total_owed")
             params = q_info.get("params", {})
+            if qtype in ("profit_period", "profit_estimate", "pnl"):
+                from app.services import staff
+                if not staff.check_permission(session, business_id, user_id, "view_profit"):
+                    replies.append(Reply("You do not have permission to view profit reports.", kind="info"))
+                    continue
             ans = reports.run_query(session, business_id, qtype, params, lang, today, llm=llm)
             replies.append(Reply(ans, kind="info"))
             continue
         if v.intent == "correction":
+            from app.services import staff
+            if not staff.check_permission(session, business_id, user_id, "edit_records"):
+                replies.append(Reply("Attendants cannot edit past records. Please ask the shop owner.", kind="info"))
+                continue
             corr = v.correction or {}
             try:
                 p, reply_text = ledger.propose_correction(session, business_id, user_id, corr, text, f"{message_id}#{i}", lang)
@@ -123,6 +132,13 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today) 
         if v.intent in {"receipt", "invoice", "quote", "quotation"}:
             doc_kind = "invoice" if v.intent == "invoice" else ("quote" if v.intent in ("quote", "quotation") else "receipt")
             feature_name = "invoices" if doc_kind == "invoice" else ("quotations" if doc_kind == "quote" else "receipts")
+
+            # Check staff permissions
+            if doc_kind == "invoice":
+                from app.services import staff
+                if not staff.check_permission(session, business_id, user_id, "issue_invoices"):
+                    replies.append(Reply("You do not have permission to issue invoices.", kind="info"))
+                    continue
 
             # Check plan entitlements
             if not plans.allowed(biz, feature_name):
@@ -256,6 +272,8 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
 
 
 def _saved_text(session, business_id, tx, lang) -> str:
+    if tx.status == "pending":
+        return f"Sale for {fmt_naira(tx.total_kobo)} recorded, but stays pending until the owner approves."
     text = t(lang, "saved")
     if tx.customer_id and tx.kind in {"sale", "payment_received"}:
         balance = ledger.customer_balance_kobo(session, business_id, tx.customer_id)
@@ -267,6 +285,15 @@ def _saved_text(session, business_id, tx, lang) -> str:
 
 def handle_button(session: Session, business_id: int, user_id: int, action: str,
                   pending_id: int = 0, lang: str = "en") -> list[Reply]:
+    # Staff transaction approval buttons
+    if action == "approve_tx":
+        from app.services import staff
+        tx = staff.approve_transaction(session, business_id, pending_id, user_id)
+        return [Reply(f"Sale of {fmt_naira(tx.total_kobo)} approved and added to ledger.")]
+    if action == "reject_tx":
+        from app.services import staff
+        tx = staff.reject_transaction(session, business_id, pending_id, user_id)
+        return [Reply(f"Sale of {fmt_naira(tx.total_kobo)} rejected.")]
     # Billing & Plan button actions
     if action == "upgrade_trader":
         billing.activate_plan(session, business_id, "trader")

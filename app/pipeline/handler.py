@@ -36,6 +36,16 @@ def resolve_identity(session: Session, msg: IncomingMessage) -> tuple[User, Busi
         session.flush()
 
     biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
+    if biz is None:
+        from app.models import Staff
+        staff_row = session.scalar(
+            select(Staff).where(
+                Staff.user_id == user.id,
+                Staff.active == 1,
+            )
+        )
+        if staff_row is not None:
+            biz = session.get(Business, staff_row.business_id)
     return user, biz
 
 
@@ -105,6 +115,23 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
 
     # Deduplication check up front
     if session.get(ProcessedMessage, (msg.channel, msg.message_id)) is not None:
+        return
+
+    # Check for staff invite join codes
+    text = (msg.text or "").strip()
+    t_upper = text.upper()
+    if msg.kind == "text" and (t_upper.startswith("JOIN-") or t_upper.startswith("/JOIN ")):
+        code = t_upper.replace("/JOIN ", "JOIN-")
+        from app.services import staff
+        ok, reply_msg, st = staff.join_business_with_code(session, user.id, code)
+        if ok:
+            user.state = "DONE"
+            session.commit()
+            biz = session.get(Business, st.business_id) if st else biz
+        replies = [router.Reply(reply_msg)]
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        await _send_all(channel, session, biz, msg.user_ref, replies)
         return
 
     # 1. State machine: if user has not completed onboarding, route to onboarding

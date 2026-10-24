@@ -48,6 +48,14 @@ class MockLLM:
                     "intent": "invoice",
                 }],
             }
+        if "profit" in user_norm:
+            return {
+                "language_detected": "english",
+                "transactions": [{
+                    "intent": "query",
+                    "query": {"type": "profit_period", "params": {"period": "today"}},
+                }],
+            }
         return {
             "language_detected": "unknown",
             "transactions": [{
