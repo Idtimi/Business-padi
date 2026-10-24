@@ -127,6 +127,16 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
     if session.get(ProcessedMessage, (msg.channel, msg.message_id)) is not None:
         return
 
+    # Per-user rate limiting check
+    from app.resilience import limiter
+    allowed, _ = limiter.is_allowed(msg.user_ref)
+    if not allowed:
+        log.warning("Rate limit exceeded for user %s", mask(msg.user_ref))
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        await _send_all(channel, session, biz, msg.user_ref, [router.Reply("You are sending messages too quickly. Please wait a moment.")])
+        return
+
     # Check for STOP / START keywords
     text = (msg.text or "").strip()
     t_upper = text.upper()

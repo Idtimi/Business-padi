@@ -122,3 +122,69 @@ Under WhatsApp Manager > **Message Templates**, submit the required utility temp
 - [ ] Confirm free-form messages outside the 24-hour window are blocked, enforcing template delivery.
 - [ ] Monitor daily and monthly message budgets via the admin `cost report` command.
 - [ ] Run `python scripts/price_check.py` periodically to track tier margins against Meta's rate card.
+
+---
+
+## Deployment & Operations (Phase 14)
+
+### Docker Deployment
+The application includes a production-ready `Dockerfile` based on `python:3.12-slim` with `ffmpeg`, Pango/Cairo libraries, and DejaVu fonts pre-installed for reliable PDF generation.
+
+1. **Build Container Image**:
+   ```bash
+   docker build -t voice-ledger:latest .
+   ```
+
+2. **Run Container**:
+   ```bash
+   docker run -d \
+     --name voice-ledger \
+     -p 8000:8000 \
+     -e DATABASE_URL=sqlite:///./data/ledger.db \
+     -e APP_ENV=production \
+     -v voice_ledger_data:/app/data \
+     voice-ledger:latest
+   ```
+
+3. **Health & Readiness Endpoints**:
+   - `GET /health`: Liveness probe returning `{"status": "ok", "app": "voice-ledger"}`.
+   - `GET /ready`: Readiness probe verifying database connectivity `{"status": "ready", "database": "connected"}`.
+
+### Offline Demo Mode
+VoiceLedger can be run 100% offline without internet access or live Meta/ASR API credentials:
+
+1. **Enable Demo Mode in `.env` or Environment**:
+   ```ini
+   DEMO_MODE=true
+   ASR_PROVIDER=mock
+   LLM_PROVIDER=mock
+   ```
+
+2. **Seed Realistic Demo Data**:
+   Populates "Mama Ngozi Provisions" with 3 weeks of customers, transactions, stock inventory, payments, and documents:
+   ```bash
+   python scripts/seed_demo.py
+   ```
+
+3. **Export Pilot Metrics**:
+   Outputs Traction slide analytics per Part H (active traders, retention, accuracy, costs):
+   ```bash
+   python scripts/export_pilot_metrics.py --output pilot_metrics.csv
+   ```
+
+### Database Backup & Retention
+Automated backup utility supporting SQLite and PostgreSQL with rolling 7-backup retention:
+```bash
+# Run manual backup (keeps last 7 backups in ./backups)
+python scripts/backup.py --keep 7 --dir backups
+```
+Schedule via cron or systemd timer for daily execution.
+
+### Troubleshooting
+
+- **Webhook 403 / Invalid Signature**: Ensure `WHATSAPP_APP_SECRET` matches your Meta App Dashboard secret exactly. The request payload body must not be modified or re-encoded prior to HMAC-SHA256 verification.
+- **Rate Limit Exceeded (HTTP 429)**: The system applies a per-minute sliding window rate limiter (default: 30 requests/minute). Adjust `RATE_LIMIT_PER_MINUTE` in configuration if necessary for high-throughput batch webhooks.
+- **External API Timeouts / Transient Failures**: Outgoing WhatsApp API calls automatically retry up to 3 times with exponential backoff and jitter. Check structured JSON logs for retry warnings (`External API call failed, retrying in ...s`).
+- **Missing DejaVu Fonts in Docker**: If DejaVu fonts are not found on custom base images, ensure `fonts-dejavu-core` is installed via `apt-get` or ReportLab will fall back to standard Helvetica.
+- **Database Lock (SQLite)**: When running multiple workers under high concurrency, ensure SQLite WAL mode is enabled or migrate to PostgreSQL by setting `DATABASE_URL=postgresql://user:pass@host:5432/ledger`.
+

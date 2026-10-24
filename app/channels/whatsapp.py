@@ -125,15 +125,27 @@ class WhatsAppChannel:
         return f"{GRAPH_BASE}/{self._api_version}/{self._phone_number_id}/messages"
 
     async def _post(self, body: dict) -> dict:
-        """POST JSON to the messages endpoint and return the response body."""
-        resp = await self._client.post(
-            self._url,
-            json=body,
-            headers={"Authorization": f"Bearer {self._token}",
-                      "Content-Type": "application/json"},
-        )
-        resp.raise_for_status()
-        return resp.json()
+        """POST JSON to the messages endpoint and return the response body with retry."""
+        from app.config import settings
+        if settings.demo_mode:
+            import uuid
+            msg_id = f"wamid.demo_{uuid.uuid4().hex[:12]}"
+            log.info("DEMO_MODE=True: mock send to %s (id: %s)", body.get("to"), msg_id)
+            return {"messaging_product": "whatsapp", "contacts": [{"input": body.get("to"), "wa_id": body.get("to")}], "messages": [{"id": msg_id}]}
+
+        from app.resilience import call_with_retry
+
+        async def _do_post():
+            resp = await self._client.post(
+                self._url,
+                json=body,
+                headers={"Authorization": f"Bearer {self._token}",
+                          "Content-Type": "application/json"},
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        return await call_with_retry(_do_post, max_retries=3)
 
     async def send_text(self, user_ref: str, text: str) -> dict:
         return await self._post({

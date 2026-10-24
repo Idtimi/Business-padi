@@ -5,3 +5,6 @@ __pycache__/
 data/
 media/
 .pytest_cache/
+backups/
+pilot_metrics.csv
+

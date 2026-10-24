@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     ai_cost_per_entry_kobo: int = 1500
     daily_message_cost_alert_kobo: int | None = None
     demo_mode: bool = False
+    rate_limit_per_minute: int = 30
+    log_format: str = "json"
 
 
 settings = Settings()
