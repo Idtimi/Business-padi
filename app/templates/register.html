@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Shop Account - Business Padi</title>
+
+    <!-- Official Brand Deck Google Fonts (Lato & Nunito Sans) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@700;900&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --padi-navy: #0D1F45;
+            --padi-orange: #FF6A13;
+            --padi-orange-hover: #E55909;
+            --padi-sunshine: #FFC233;
+            --padi-deep-orange: #C24A06;
+            --padi-cream: #FFF6EC;
+            --padi-mist: #F1F4F9;
+            --padi-border: #E2E8F0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--padi-mist);
+            color: var(--padi-navy);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2.5rem 1rem;
+        }
+
+        .register-card {
+            background: white;
+            border: 1px solid var(--padi-border);
+            border-radius: 16px;
+            padding: 2.5rem 2.25rem;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: 0 10px 25px -5px rgba(13, 31, 69, 0.08), 0 8px 10px -6px rgba(13, 31, 69, 0.03);
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        /* App Icon Tile from Brand Deck */
+        .app-icon-tile {
+            width: 64px;
+            height: 64px;
+            background: var(--padi-navy);
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 12px rgba(13, 31, 69, 0.2);
+        }
+
+        .brand-title {
+            font-family: 'Lato', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--padi-navy);
+            letter-spacing: -0.02em;
+        }
+
+        .brand-title span {
+            color: var(--padi-orange);
+            font-weight: 900;
+        }
+
+        .brand-subtitle {
+            font-size: 0.95rem;
+            color: #5A6B87;
+            margin-top: 0.25rem;
+        }
+
+        .alert-error {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #991B1B;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+            color: var(--padi-navy);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--padi-border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            color: var(--padi-navy);
+            background: white;
+            transition: all 0.15s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--padi-orange);
+            box-shadow: 0 0 0 3px rgba(255, 106, 19, 0.15);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .color-selector {
+            display: flex;
+            gap: 0.65rem;
+            margin-top: 0.5rem;
+        }
+
+        .color-option {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .color-option input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .color-option.selected {
+            outline: 2px solid var(--padi-navy);
+        }
+
+        .terms-box {
+            background: var(--padi-cream);
+            border: 1px solid #FED7AA;
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            color: #5A6B87;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.65rem;
+        }
+
+        .terms-box input {
+            margin-top: 0.2rem;
+            cursor: pointer;
+        }
+
+        .btn-submit {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0.85rem 1.25rem;
+            border-radius: 8px;
+            font-size: 1.05rem;
+            font-weight: 800;
+            background: var(--padi-orange);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(255, 106, 19, 0.25);
+        }
+
+        .btn-submit:hover {
+            background: var(--padi-orange-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(255, 106, 19, 0.35);
+        }
+
+        .footer-note {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: #5A6B87;
+        }
+
+        .footer-note a {
+            color: var(--padi-orange);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .footer-note a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 480px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="register-card">
+        <div class="header-section">
+            <!-- Brand Logo Mark -->
+            <div class="app-icon-tile">
+                <svg viewBox="0 0 100 95" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 40px; height: 40px;">
+                    <path d="M22 10C56 10 78 22 78 45C78 65 58 74 36 74L36 84C36 89.5 31.5 94 26 94C20.5 94 16 89.5 16 84L16 24C16 16.3 22 10 26 10H22Z" fill="#FF6A13"/>
+                    <rect x="34" y="28" width="26" height="32" rx="13" fill="#0D1F45"/>
+                    <rect x="39" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+                    <rect x="45.4" y="33" width="3.2" height="22" rx="1.6" fill="#FF6A13"/>
+                    <rect x="51.8" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+                    <circle cx="82" cy="18" r="8" fill="#FFC233"/>
+                </svg>
+            </div>
+            <div class="brand-title">Create Your <span>Business Padi</span></div>
+            <p class="brand-subtitle">Set up your digital ledger, credit book & branded receipts in 30 seconds.</p>
+        </div>
+
+        {% if error %}
+        <div class="alert-error">
+            ⚠️ {{ error }}
+        </div>
+        {% endif %}
+
+        <form action="/d/register" method="POST">
+            <!-- Full Name -->
+            <div class="form-group">
+                <label class="form-label">Your Full Name (Shop Owner)</label>
+                <input type="text" name="name" class="form-control" placeholder="e.g. Alhaji Musa or Blessing Okeke" required autofocus>
+            </div>
+
+            <div class="grid-2">
+                <!-- Phone Number -->
+                <div class="form-group">
+                    <label class="form-label">WhatsApp Number</label>
+                    <input type="tel" name="phone" class="form-control" placeholder="+234 801 234 5678" required>
+                </div>
+
+                <!-- Preferred Language -->
+                <div class="form-group">
+                    <label class="form-label">Preferred Language</label>
+                    <select name="language" class="form-control">
+                        <option value="pcm">Nigerian Pidgin (Default)</option>
+                        <option value="en">English</option>
+                        <option value="yo">Yorùbá</option>
+                        <option value="ha">Hausa</option>
+                        <option value="ig">Igbo</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Shop Name -->
+            <div class="form-group">
+                <label class="form-label">Shop / Business Name</label>
+                <input type="text" name="shop_name" class="form-control" placeholder="e.g. Alaba Electronics & Provisions" required>
+            </div>
+
+            <div class="grid-2">
+                <!-- Trade Category -->
+                <div class="form-group">
+                    <label class="form-label">Business Type</label>
+                    <select name="category" class="form-control">
+                        <option value="Provisions & Food">Provisions & Foodstuff</option>
+                        <option value="Electronics & Phones">Electronics & Phones</option>
+                        <option value="Fashion & Fabrics">Fashion & Textiles</option>
+                        <option value="Building Materials">Building Materials & Hardware</option>
+                        <option value="Pharmacy & Chemist">Chemist / Pharmacy</option>
+                        <option value="Artisan & Services">Artisan & General Trade</option>
+                    </select>
+                </div>
+
+                <!-- Address -->
+                <div class="form-group">
+                    <label class="form-label">Shop Address / Market</label>
+                    <input type="text" name="address" class="form-control" placeholder="e.g. Line 4, Bodija Market, Ibadan">
+                </div>
+            </div>
+
+            <!-- Brand Color Preference for Receipts & Dashboard -->
+            <div class="form-group">
+                <label class="form-label">Receipt Brand Color</label>
+                <div class="color-selector">
+                    <label class="color-option selected" style="background: #FF6A13;" title="Padi Orange">
+                        <input type="radio" name="brand_color" value="#FF6A13" checked>
+                    </label>
+                    <label class="color-option" style="background: #0D1F45;" title="Padi Navy">
+                        <input type="radio" name="brand_color" value="#0D1F45">
+                    </label>
+                    <label class="color-option" style="background: #16A34A;" title="Forest Green">
+                        <input type="radio" name="brand_color" value="#16A34A">
+                    </label>
+                    <label class="color-option" style="background: #2563EB;" title="Royal Blue">
+                        <input type="radio" name="brand_color" value="#2563EB">
+                    </label>
+                    <label class="color-option" style="background: #7C3AED;" title="Purple">
+                        <input type="radio" name="brand_color" value="#7C3AED">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Consent Checkbox (NDPA Compliance) -->
+            <div class="terms-box">
+                <input type="checkbox" name="consent" id="consent" value="1" required checked>
+                <label for="consent" style="cursor: pointer; line-height: 1.4;">
+                    I agree to Business Padi keeping my bookkeeping records, stock, and credit transactions secure in compliance with the Nigeria Data Protection Act (NDPA).
+                </label>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn-submit">
+                🚀 Create My Shop Account & Enter
+            </button>
+        </form>
+
+        <div class="footer-note">
+            Already have an account? <a href="/d/login">Log in here</a> or <a href="/d/login/demo">View Demo Shop</a>
+        </div>
+    </div>
+
+    <script>
+        // Update selected color border
+        document.querySelectorAll('.color-option input').forEach(input => {
+            input.addEventListener('change', () => {
+                document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+                input.parentElement.classList.add('selected');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -26,6 +26,20 @@
     </div>
 </div>
 
+{% if request.query_params.get('welcome') %}
+<div class="card" style="background: var(--padi-cream); border: 2px solid #FED7AA; margin-bottom: 1.5rem; padding: 1.25rem 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.85rem;">
+        <span style="font-size: 2rem;">🎉</span>
+        <div>
+            <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--padi-deep-orange);">Welcome to Business Padi!</h3>
+            <p style="font-size: 0.9rem; color: #5A6B87; margin-top: 0.2rem;">
+                Your digital shop ledger for <strong>{{ business.name }}</strong> is live. We've set up your credit book, inventory tracker, and branded receipts. Try exporting your ledger or exploring your tabs above!
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Quick Navigation Bar for Live Demo -->
 <div class="card" style="padding: 1rem 1.25rem; margin-bottom: 1.75rem; background: #FFFFFF; border-left: 4px solid var(--padi-orange);">
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">

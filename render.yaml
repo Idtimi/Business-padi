@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: business-padi
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        value: sqlite:///./data/ledger.db
+      - key: TZ
+        value: Africa/Lagos
+      - key: DEFAULT_LANGUAGE
+        value: pcm
+      - key: LANGUAGES_ENABLED
+        value: pcm,en,yo,ha,ig
+      - key: BILLING_TEST_MODE
+        value: "true"
+      - key: DEMO_MODE
+        value: "true"
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1

@@ -16,6 +16,7 @@ from app.models import (
     Business,
     Consent,
     Customer,
+    DocCounter,
     Document,
     Invite,
     Payment,
@@ -24,6 +25,7 @@ from app.models import (
     Transaction,
     User,
     get_tz,
+    now_iso,
 )
 from app.money import fmt_naira
 from app.services import billing, dashboard, documents, ledger, plans, reports, staff
@@ -101,6 +103,105 @@ def login_page(request: Request, token: str | None = None, error: str | None = N
         )
         return resp
     return templates.TemplateResponse(request, "login.html", {"error": error})
+
+
+@router.get("/register", response_class=HTMLResponse)
+def register_page(request: Request, error: str | None = None):
+    return templates.TemplateResponse(request, "register.html", {"error": error})
+
+
+@router.post("/register")
+def register_action(
+    name: str = Form(...),
+    phone: str = Form(...),
+    shop_name: str = Form(...),
+    language: str = Form("pcm"),
+    category: str = Form("Provisions & Food"),
+    address: str = Form(""),
+    brand_color: str = Form("#FF6A13"),
+    db: Session = Depends(get_db),
+):
+    clean_p = phone.strip().replace(" ", "").replace("-", "")
+    if not clean_p or not name.strip() or not shop_name.strip():
+        return RedirectResponse(
+            url="/d/register?error=Please+fill+in+all+required+fields.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    # Check if user already exists
+    user = db.scalar(
+        select(User).where(
+            (User.channel_user_id == clean_p)
+            | (User.channel_user_id == clean_p.lstrip("+"))
+            | (User.channel_user_id.endswith(clean_p[-10:] if len(clean_p) >= 10 else clean_p))
+        )
+    )
+    if user is None:
+        user = User(
+            channel="whatsapp",
+            channel_user_id=clean_p,
+            display_name=name.strip(),
+            language=language,
+            state="DONE",
+            consent_at=now_iso(),
+        )
+        db.add(user)
+        db.flush()
+    else:
+        user.display_name = name.strip()
+        user.language = language
+
+    # Check if business already exists for this user
+    biz = db.scalar(select(Business).where(Business.owner_user_id == user.id))
+    if biz is None:
+        biz = Business(
+            owner_user_id=user.id,
+            name=shop_name.strip(),
+            phone=clean_p,
+            address=address.strip() or None,
+            brand_color=brand_color,
+            plan="starter",
+            created_at=now_iso(),
+        )
+        db.add(biz)
+        db.flush()
+
+        # Initialize document sequence counters
+        for kind in ("receipt", "invoice", "statement", "quote"):
+            db.add(DocCounter(business_id=biz.id, kind=kind, last_no=0))
+
+        # Seed 1 initial starter sale so the new account feels alive immediately
+        c = Customer(business_id=biz.id, name="First Customer", phone="+2348000000000")
+        db.add(c)
+        db.flush()
+        t1 = Transaction(
+            business_id=biz.id,
+            customer_id=c.id,
+            kind="sale",
+            items_json=[{"item": "Sample Item", "qty": 1, "unit_price": 5000, "total": 5000}],
+            total_kobo=500_000,
+            paid_kobo=500_000,
+            status="confirmed",
+            created_by_user_id=user.id,
+            created_at=now_iso(),
+            source_msg_id=f"welcome_{user.id}",
+        )
+        db.add(t1)
+
+        staff.log_audit(db, biz.id, user.id, "register_shop", f"Registered shop {shop_name}")
+        db.commit()
+
+    # Create session cookie and redirect to overview with welcome banner
+    cookie = dashboard.create_session_cookie(user.id, biz.id)
+    resp = RedirectResponse(url="/d?welcome=1", status_code=status.HTTP_303_SEE_OTHER)
+    resp.set_cookie(
+        key=dashboard.SESSION_COOKIE_NAME,
+        value=cookie,
+        httponly=True,
+        path="/",
+        samesite="lax",
+    )
+    return resp
 
 
 @router.get("/login/demo")

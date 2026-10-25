@@ -273,3 +273,50 @@ def test_staff_dashboard_management_actions(db_session):
     session.refresh(staff_row)
     assert staff_row.active == 0
 
+
+def test_create_shop_account_flow(db_session):
+    """Test public web account registration flow."""
+    session, _ = db_session
+    client = TestClient(app)
+
+    # 1. Open registration page
+    resp_get = client.get("/d/register")
+    assert resp_get.status_code == 200
+    assert "Create Your" in resp_get.text
+    assert "WhatsApp Number" in resp_get.text
+
+    # 2. Submit registration
+    resp_post = client.post(
+        "/d/register",
+        data={
+            "name": "Folake Adebayo",
+            "phone": "+2348055667788",
+            "shop_name": "Folake Fabrics & Lace",
+            "language": "yo",
+            "category": "Fashion & Fabrics",
+            "address": "Balogun Market, Lagos Island",
+            "brand_color": "#FF6A13",
+            "consent": "1",
+        },
+        follow_redirects=False,
+    )
+    assert resp_post.status_code == 303
+    assert "vl_session=" in resp_post.headers["set-cookie"]
+    cookie = resp_post.cookies["vl_session"]
+
+    # 3. Load overview with session cookie
+    resp_overview = client.get("/d", cookies={"vl_session": cookie})
+    assert resp_overview.status_code == 200
+    assert "Folake" in resp_overview.text
+
+    # Verify user and business were created in DB
+    user = session.scalar(select(m.User).where(m.User.display_name == "Folake Adebayo"))
+    assert user is not None
+    assert user.channel_user_id == "+2348055667788"
+
+    biz = session.scalar(select(m.Business).where(m.Business.owner_user_id == user.id))
+    assert biz is not None
+    assert biz.name == "Folake Fabrics & Lace"
+    assert biz.brand_color == "#FF6A13"
+
+
