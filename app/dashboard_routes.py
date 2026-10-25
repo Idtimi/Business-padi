@@ -1,7 +1,8 @@
 """Web dashboard routes mounted under /d."""
 
 import os
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, Form, Header, HTTPException, Query, Request, Response, status
@@ -20,6 +21,7 @@ from app.models import (
     Document,
     Invite,
     Payment,
+    PendingAction,
     Staff,
     StockItem,
     Transaction,
@@ -117,6 +119,7 @@ def register_action(
     shop_name: str = Form(...),
     language: str = Form("pcm"),
     category: str = Form("Provisions & Food"),
+    custom_category: str = Form(""),
     address: str = Form(""),
     brand_color: str = Form("#FF6A13"),
     db: Session = Depends(get_db),
@@ -127,6 +130,9 @@ def register_action(
             url="/d/register?error=Please+fill+in+all+required+fields.",
             status_code=status.HTTP_303_SEE_OTHER,
         )
+
+    # Determine final trade category
+    effective_category = custom_category.strip() if (category == "Others" and custom_category.strip()) else category.strip()
 
     # Check if user already exists
     user = db.scalar(
@@ -161,6 +167,7 @@ def register_action(
             address=address.strip() or None,
             brand_color=brand_color,
             plan="starter",
+            custom_fields={"category": effective_category},
             created_at=now_iso(),
         )
         db.add(biz)
@@ -230,23 +237,37 @@ def demo_login_action(db: Session = Depends(get_db)):
     return resp
 
 
+def _normalize_phone(p: str) -> str:
+    s = p.strip().replace(" ", "").replace("-", "")
+    if s.startswith("+"):
+        s = s[1:]
+    return s
+
+
+def _mask_phone(phone: str) -> str:
+    clean = phone.strip()
+    if len(clean) >= 10:
+        return f"{clean[:4]} ••• ••• {clean[-2:]}"
+    return clean
+
+
 @router.post("/login/phone")
 def phone_login_action(
     phone: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    """Direct phone number login for registered shop owners."""
-    clean_p = phone.strip().replace(" ", "").replace("-", "")
+    """Initiates OTP verification for registered shop owners or staff."""
+    norm_p = _normalize_phone(phone)
     user = db.scalar(
         select(User).where(
-            (User.channel_user_id == clean_p)
-            | (User.channel_user_id == clean_p.lstrip("+"))
-            | (User.channel_user_id.endswith(clean_p[-10:] if len(clean_p) >= 10 else clean_p))
+            (User.channel_user_id == norm_p)
+            | (User.channel_user_id == f"+{norm_p}")
+            | (User.channel_user_id.endswith(norm_p[-10:] if len(norm_p) >= 10 else norm_p))
         )
     )
     if user is None:
         return RedirectResponse(
-            url="/d/login?error=Phone+number+not+found.+Please+check+the+number+or+launch+the+demo+shop.",
+            url="/d/login?error=Phone+number+not+found.+Please+check+the+number+or+create+a+free+shop+account.",
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
@@ -263,7 +284,123 @@ def phone_login_action(
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
-    cookie = dashboard.create_session_cookie(user.id, biz.id)
+    # Generate 6-digit OTP code (random 100000 - 999999)
+    otp_code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+
+    # Invalidate older pending OTP actions for this user
+    old_actions = db.scalars(
+        select(PendingAction).where(
+            PendingAction.user_id == user.id,
+            PendingAction.kind == "login_otp",
+            PendingAction.status == "open",
+        )
+    ).all()
+    for old in old_actions:
+        old.status = "superseded"
+
+    # Save new OTP action
+    action = PendingAction(
+        business_id=biz.id,
+        user_id=user.id,
+        kind="login_otp",
+        payload={"otp": otp_code, "phone": norm_p},
+        status="open",
+        expires_at=expires_at,
+    )
+    db.add(action)
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/d/login/verify-otp?phone={norm_p}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get("/login/verify-otp", response_class=HTMLResponse)
+def verify_otp_page(
+    request: Request,
+    phone: str = Query(...),
+    error: str | None = None,
+    db: Session = Depends(get_db),
+):
+    norm_p = _normalize_phone(phone)
+    candidates = db.scalars(
+        select(PendingAction)
+        .where(
+            PendingAction.kind == "login_otp",
+            PendingAction.status == "open",
+        )
+        .order_by(PendingAction.id.desc())
+    ).all()
+
+    action = next((c for c in candidates if c.payload and _normalize_phone(str(c.payload.get("phone", ""))) == norm_p), None)
+    if not action:
+        return RedirectResponse(
+            url="/d/login?error=Login+session+expired.+Please+enter+your+phone+again.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    otp_code = action.payload.get("otp", "")
+    masked = _mask_phone(f"+{norm_p}" if not phone.startswith("+") else phone)
+
+    return templates.TemplateResponse(
+        request,
+        "verify_otp.html",
+        {
+            "phone": norm_p,
+            "masked_phone": masked,
+            "otp_code": otp_code,
+            "error": error,
+        },
+    )
+
+
+@router.post("/login/verify-otp")
+def verify_otp_action(
+    phone: str = Form(...),
+    otp: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    norm_p = _normalize_phone(phone)
+    clean_otp = otp.strip().replace(" ", "")
+
+    candidates = db.scalars(
+        select(PendingAction)
+        .where(
+            PendingAction.kind == "login_otp",
+            PendingAction.status == "open",
+        )
+        .order_by(PendingAction.id.desc())
+    ).all()
+
+    matched = next((c for c in candidates if c.payload and _normalize_phone(str(c.payload.get("phone", ""))) == norm_p), None)
+    if not matched:
+        return RedirectResponse(
+            url="/d/login?error=Verification+code+expired.+Please+request+a+new+one.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    if matched.expires_at and matched.expires_at < now_iso():
+        matched.status = "expired"
+        db.commit()
+        return RedirectResponse(
+            url=f"/d/login/verify-otp?phone={norm_p}&error=Verification+code+has+expired.+Please+resend.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    expected_otp = str(matched.payload.get("otp", ""))
+    if clean_otp != expected_otp:
+        return RedirectResponse(
+            url=f"/d/login/verify-otp?phone={norm_p}&error=Incorrect+6-digit+code.+Please+try+again.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    # Valid OTP verified!
+    matched.status = "confirmed"
+    db.commit()
+
+    cookie = dashboard.create_session_cookie(matched.user_id, matched.business_id)
     resp = RedirectResponse(url="/d", status_code=status.HTTP_303_SEE_OTHER)
     resp.set_cookie(
         key=dashboard.SESSION_COOKIE_NAME,

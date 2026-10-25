@@ -228,17 +228,21 @@
             </form>
         </div>
 
-        <div class="divider">OR LOG IN WITH PHONE</div>
+        <div class="divider">OR LOG IN WITH PHONE OTP</div>
 
-        <!-- Phone Number Login -->
+        <!-- Phone Number OTP Login -->
         <form action="/d/login/phone" method="POST" style="text-align: left;">
             <label style="display: block; font-size: 0.82rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--padi-navy); text-transform: uppercase; letter-spacing: 0.04em;">
-                Shop Owner WhatsApp Number
+                Shop WhatsApp Number
             </label>
             <input type="text" name="phone" class="form-control" placeholder="+234 810 159 3645 or 08011223344" required>
-            <button type="submit" class="btn btn-navy">
-                Log In to My Shop
+            <button type="submit" class="btn btn-navy" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                <span>Send OTP Code</span>
+                <span>→</span>
             </button>
+            <div style="font-size: 0.78rem; color: #64748B; margin-top: 0.4rem; text-align: center;">
+                🔒 Secure 6-digit one-time password verification
+            </div>
         </form>
 
         <div style="margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--padi-border);">

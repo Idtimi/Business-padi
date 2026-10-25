@@ -72,7 +72,8 @@ def test_acceptance_attendant_large_sale_stays_pending_until_owner_approves(sess
 
     # Threshold is 100,000 NGN. RICE sale is 127,500 NGN.
     # Attendant sends voice/text sale note
-    replies = router.handle_text(session, biz.id, attendant.id, RICE, "att-msg-1", today=date(2026, 10, 24))
+    today = datetime.now(m.get_tz()).date()
+    replies = router.handle_text(session, biz.id, attendant.id, RICE, "att-msg-1", today=today)
     assert len(replies) == 1
     assert replies[0].kind == "confirm"
 
@@ -88,7 +89,7 @@ def test_acceptance_attendant_large_sale_stays_pending_until_owner_approves(sess
     assert tx.total_kobo == to_kobo(127_500)
 
     # 2. Reports exclude pending transactions!
-    sales_rep = reports.sales_period(session, biz.id, period="today", today=date(2026, 10, 24))
+    sales_rep = reports.sales_period(session, biz.id, period="today", today=today)
     assert sales_rep["total_kobo"] == 0
     assert sales_rep["count"] == 0
 
@@ -97,7 +98,7 @@ def test_acceptance_attendant_large_sale_stays_pending_until_owner_approves(sess
     assert approved_tx.status == "confirmed"
 
     # 4. Reports now include the approved transaction!
-    sales_rep_after = reports.sales_period(session, biz.id, period="today", today=date(2026, 10, 24))
+    sales_rep_after = reports.sales_period(session, biz.id, period="today", today=today)
     assert sales_rep_after["total_kobo"] == to_kobo(127_500)
     assert sales_rep_after["count"] == 1
 

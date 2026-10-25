@@ -58,7 +58,7 @@ def test_acceptance_summary_numbers_equal_database_sums(session):
     Summary numbers equal database sums: sales, expenses, and profit estimate.
     """
     u, b = make_business(session)
-    today = date(2026, 10, 24)
+    today = datetime.now(m.get_tz()).date()
     c = ledger.get_or_create_customer(session, b.id, "Mama Ngozi")
 
     # Record 2 sales today: 50,000 NGN and 30,000 NGN = 80,000 NGN total
@@ -107,7 +107,7 @@ def test_acceptance_pnl_pdf_matches_the_ledger(session, tmp_path, monkeypatch):
     """
     monkeypatch.setattr(documents, "MEDIA_DIR", tmp_path / "docs")
     u, b = make_business(session)
-    today = date(2026, 10, 24)
+    today = datetime.now(m.get_tz()).date()
 
     # Add inventory and restock
     item = stock.get_or_create_item(session, b.id, "Rice", base_unit="bag")
@@ -155,7 +155,7 @@ def test_rule_based_nudges_trigger_on_seeded_data(session):
     3. Week-on-week drop >= 20%
     """
     u, b = make_business(session)
-    today = date(2026, 10, 24)
+    today = datetime.now(m.get_tz()).date()
 
     # 1. Customer owing over 30 days:
     # Sale created 40 days ago (2026-09-14)

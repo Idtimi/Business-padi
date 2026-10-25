@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Code - Business Padi</title>
+
+    <!-- Official Brand Deck Google Fonts (Lato & Nunito Sans) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@700;900&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --padi-navy: #0D1F45;
+            --padi-orange: #FF6A13;
+            --padi-orange-hover: #E55909;
+            --padi-sunshine: #FFC233;
+            --padi-deep-orange: #C24A06;
+            --padi-cream: #FFF6EC;
+            --padi-mist: #F1F4F9;
+            --padi-border: #E2E8F0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--padi-mist);
+            color: var(--padi-navy);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1.5rem 1rem;
+        }
+
+        .login-card {
+            background: white;
+            border: 1px solid var(--padi-border);
+            border-radius: 16px;
+            padding: 2.75rem 2.25rem;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 10px 25px -5px rgba(13, 31, 69, 0.08), 0 8px 10px -6px rgba(13, 31, 69, 0.03);
+            text-align: center;
+        }
+
+        .app-icon-tile {
+            width: 72px;
+            height: 72px;
+            background: var(--padi-navy);
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 4px 12px rgba(13, 31, 69, 0.2);
+        }
+
+        .brand-title {
+            font-family: 'Lato', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--padi-navy);
+            letter-spacing: -0.02em;
+        }
+
+        .brand-title span {
+            color: var(--padi-orange);
+            font-weight: 900;
+        }
+
+        .brand-tagline {
+            font-size: 0.92rem;
+            color: #5A6B87;
+            margin-top: 0.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .alert-error {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #991B1B;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0.85rem 1.25rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 800;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--padi-orange);
+            color: white;
+            box-shadow: 0 2px 4px rgba(255, 106, 19, 0.25);
+        }
+
+        .btn-primary:hover {
+            background: var(--padi-orange-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(255, 106, 19, 0.35);
+        }
+
+        .otp-input {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border: 2px solid var(--padi-border);
+            border-radius: 10px;
+            font-size: 1.75rem;
+            font-weight: 800;
+            font-family: monospace;
+            letter-spacing: 0.4em;
+            text-align: center;
+            color: var(--padi-navy);
+            margin-bottom: 1.25rem;
+            transition: all 0.2s ease;
+            background: #FAFCFF;
+        }
+
+        .otp-input:focus {
+            outline: none;
+            border-color: var(--padi-orange);
+            box-shadow: 0 0 0 4px rgba(255, 106, 19, 0.15);
+            background: white;
+        }
+
+        .demo-box {
+            background: var(--padi-cream);
+            border: 1px solid #FED7AA;
+            border-radius: 12px;
+            padding: 1.1rem 1rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .phone-badge {
+            display: inline-block;
+            background: #E2E8F0;
+            color: var(--padi-navy);
+            font-weight: 700;
+            font-size: 0.85rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 20px;
+            margin-bottom: 1.25rem;
+        }
+
+        .footer-links {
+            margin-top: 1.5rem;
+            font-size: 0.88rem;
+            color: #5A6B87;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+
+        .footer-links a {
+            color: var(--padi-orange);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <!-- App Icon -->
+        <div class="app-icon-tile">
+            <svg viewBox="0 0 100 95" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 48px; height: 48px;">
+                <path d="M22 10C56 10 78 22 78 45C78 65 58 74 36 74L36 84C36 89.5 31.5 94 26 94C20.5 94 16 89.5 16 84L16 24C16 16.3 22 10 26 10H22Z" fill="#FF6A13"/>
+                <rect x="34" y="28" width="26" height="32" rx="13" fill="#0D1F45"/>
+                <rect x="39" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+                <rect x="45.4" y="33" width="3.2" height="22" rx="1.6" fill="#FF6A13"/>
+                <rect x="51.8" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+                <circle cx="82" cy="18" r="8" fill="#FFC233"/>
+            </svg>
+        </div>
+
+        <div class="brand-title">Enter <span>OTP Code</span></div>
+        <p class="brand-tagline">We sent a 6-digit one-time password to verify your account.</p>
+
+        <div class="phone-badge">
+            📲 Sent to {{ masked_phone }}
+        </div>
+
+        {% if error %}
+        <div class="alert-error">
+            ⚠️ {{ error }}
+        </div>
+        {% endif %}
+
+        {% if otp_code %}
+        <!-- Live Demo / Evaluation Quick-Fill Banner -->
+        <div class="demo-box">
+            <div style="font-size: 0.78rem; font-weight: 800; color: var(--padi-deep-orange); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;">
+                🏆 Testing & Evaluation Code
+            </div>
+            <div style="font-size: 0.82rem; color: #5A6B87; margin-bottom: 0.6rem;">
+                Competition judges & testers can use this instant OTP:
+            </div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                <span id="demo_otp_val" style="font-family: monospace; font-size: 1.35rem; font-weight: 900; letter-spacing: 0.2em; color: var(--padi-navy); background: white; padding: 0.35rem 0.85rem; border-radius: 8px; border: 1px solid #FED7AA;">{{ otp_code }}</span>
+                <button type="button" onclick="autoFillOtp('{{ otp_code }}')" style="border: none; background: var(--padi-navy); color: white; padding: 0.45rem 0.85rem; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+                    Auto-Fill
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        <form action="/d/login/verify-otp" method="POST">
+            <input type="hidden" name="phone" value="{{ phone }}">
+
+            <div style="text-align: left; margin-bottom: 0.4rem;">
+                <label style="font-size: 0.82rem; font-weight: 700; color: var(--padi-navy); text-transform: uppercase; letter-spacing: 0.04em;">
+                    6-Digit Verification Code
+                </label>
+            </div>
+
+            <input type="text" id="otp_input" name="otp" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="123456" autofocus required class="otp-input">
+
+            <button type="submit" class="btn btn-primary">
+                Verify & Open Dashboard →
+            </button>
+        </form>
+
+        <div class="footer-links">
+            <form action="/d/login/phone" method="POST" style="margin: 0;">
+                <input type="hidden" name="phone" value="{{ phone }}">
+                <button type="submit" style="background: none; border: none; color: var(--padi-orange); font-weight: 700; font-size: 0.88rem; cursor: pointer; text-decoration: underline; font-family: inherit;">
+                    Didn't receive code? Resend OTP
+                </button>
+            </form>
+            <div>
+                <a href="/d/login">← Use a different phone number</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function autoFillOtp(code) {
+            const input = document.getElementById('otp_input');
+            input.value = code;
+            input.focus();
+        }
+    </script>
+</body>
+</html>

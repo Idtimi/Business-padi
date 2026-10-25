@@ -320,3 +320,95 @@ def test_create_shop_account_flow(db_session):
     assert biz.brand_color == "#FF6A13"
 
 
+def test_registration_with_others_category_and_custom_color(db_session):
+    """Test registration when 'Others' business type is chosen along with a custom brand color."""
+    session, _ = db_session
+    client = TestClient(app)
+
+    resp_post = client.post(
+        "/d/register",
+        data={
+            "name": "Chidi Okonkwo",
+            "phone": "+2348099887766",
+            "shop_name": "Chidi Clean Energy Solutions",
+            "language": "en",
+            "category": "Others",
+            "custom_category": "Solar & Inverter Installation",
+            "address": "Computer Village, Ikeja",
+            "brand_color": "#0D9488",
+            "consent": "1",
+        },
+        follow_redirects=False,
+    )
+    assert resp_post.status_code == 303
+    assert "vl_session=" in resp_post.headers["set-cookie"]
+
+    user = session.scalar(select(m.User).where(m.User.channel_user_id == "+2348099887766"))
+    assert user is not None
+    biz = session.scalar(select(m.Business).where(m.Business.owner_user_id == user.id))
+    assert biz is not None
+    assert biz.brand_color == "#0D9488"
+    assert biz.custom_fields == {"category": "Solar & Inverter Installation"}
+
+
+def test_phone_otp_login_flow(db_session):
+    """Test full OTP request, verification, and session creation flow."""
+    session, _ = db_session
+    client = TestClient(app)
+
+    # 1. Create a registered shop
+    user = m.User(channel="whatsapp", channel_user_id="+2348123456789", language="en", state="DONE")
+    session.add(user)
+    session.flush()
+    biz = m.Business(owner_user_id=user.id, name="Bisi Salon & Spa", phone="+2348123456789")
+    session.add(biz)
+    session.commit()
+
+    # 2. Request OTP
+    resp_req = client.post("/d/login/phone", data={"phone": "+234 812 345 6789"}, follow_redirects=False)
+    assert resp_req.status_code == 303
+    assert "/d/login/verify-otp?phone=2348123456789" in resp_req.headers["location"]
+
+    # 3. Load verification page
+    resp_get_otp = client.get(resp_req.headers["location"])
+    assert resp_get_otp.status_code == 200
+    assert "OTP Code" in resp_get_otp.text
+    assert "Testing & Evaluation Code" in resp_get_otp.text
+
+    # Verify PendingAction created in DB
+    action = session.scalar(
+        select(m.PendingAction)
+        .where(m.PendingAction.user_id == user.id, m.PendingAction.kind == "login_otp")
+        .order_by(m.PendingAction.id.desc())
+    )
+    assert action is not None
+    correct_otp = action.payload["otp"]
+    assert len(correct_otp) == 6
+
+    # 4. Attempt verification with wrong OTP
+    resp_bad = client.post(
+        "/d/login/verify-otp",
+        data={"phone": "+2348123456789", "otp": "000000"},
+        follow_redirects=False,
+    )
+    assert resp_bad.status_code == 303
+    assert "error=Incorrect" in resp_bad.headers["location"]
+
+    # 5. Verify with correct OTP
+    resp_good = client.post(
+        "/d/login/verify-otp",
+        data={"phone": "+2348123456789", "otp": correct_otp},
+        follow_redirects=False,
+    )
+    assert resp_good.status_code == 303
+    assert resp_good.headers["location"] == "/d"
+    assert "vl_session=" in resp_good.headers["set-cookie"]
+    cookie = resp_good.cookies["vl_session"]
+
+    # 6. Access dashboard with session
+    resp_dash = client.get("/d", cookies={"vl_session": cookie})
+    assert resp_dash.status_code == 200
+    assert "Bisi Salon" in resp_dash.text
+
+
+

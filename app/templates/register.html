@@ -136,8 +136,10 @@
 
         .color-selector {
             display: flex;
+            flex-wrap: wrap;
             gap: 0.65rem;
             margin-top: 0.5rem;
+            align-items: center;
         }
 
         .color-option {
@@ -150,7 +152,12 @@
             align-items: center;
             justify-content: center;
             border: 2px solid white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .color-option:hover {
+            transform: scale(1.15);
         }
 
         .color-option input {
@@ -161,6 +168,51 @@
 
         .color-option.selected {
             outline: 2px solid var(--padi-navy);
+            transform: scale(1.1);
+        }
+
+        .custom-color-picker-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.75rem;
+            background: #F8FAFC;
+            border: 1px dashed var(--padi-border);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .custom-color-picker-wrap:hover {
+            background: var(--padi-cream);
+            border-color: var(--padi-orange);
+        }
+
+        .custom-color-picker-wrap input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            background: none;
+            padding: 0;
+        }
+
+        .custom-color-picker-wrap input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .custom-color-picker-wrap input[type="color"]::-webkit-color-swatch {
+            border: 1px solid rgba(0,0,0,0.2);
+            border-radius: 50%;
+        }
+
+        .custom-hex-text {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--padi-navy);
+            font-family: monospace;
         }
 
         .terms-box {
@@ -289,14 +341,24 @@
                 <!-- Trade Category -->
                 <div class="form-group">
                     <label class="form-label">Business Type</label>
-                    <select name="category" class="form-control">
+                    <select name="category" id="category_select" class="form-control" onchange="checkCategoryOthers(this)">
                         <option value="Provisions & Food">Provisions & Foodstuff</option>
-                        <option value="Electronics & Phones">Electronics & Phones</option>
-                        <option value="Fashion & Fabrics">Fashion & Textiles</option>
+                        <option value="Electronics & Phones">Electronics, Phones & Gadgets</option>
+                        <option value="Fashion & Fabrics">Fashion, Clothing & Textiles</option>
                         <option value="Building Materials">Building Materials & Hardware</option>
                         <option value="Pharmacy & Chemist">Chemist / Pharmacy</option>
-                        <option value="Artisan & Services">Artisan & General Trade</option>
+                        <option value="Restaurant, Bar & Catering">Restaurant, Bar & Catering</option>
+                        <option value="Cosmetics, Beauty & Salon">Cosmetics, Beauty & Salon</option>
+                        <option value="Automobile & Spare Parts">Automobile & Spare Parts</option>
+                        <option value="Agriculture & Poultry">Agriculture, Farming & Poultry</option>
+                        <option value="POS Agent & Financial">POS Agent & Financial Services</option>
+                        <option value="Wholesale & Distribution">Wholesale & Supermarket</option>
+                        <option value="Artisan & Services">Artisan & Craft Services</option>
+                        <option value="Others">Others (Specify below)</option>
                     </select>
+                    <div id="custom_category_group" style="display: none; margin-top: 0.5rem;">
+                        <input type="text" name="custom_category" id="custom_category_input" class="form-control" placeholder="Specify your trade (e.g. Solar, Dry Cleaning, Tailoring)">
+                    </div>
                 </div>
 
                 <!-- Address -->
@@ -308,23 +370,50 @@
 
             <!-- Brand Color Preference for Receipts & Dashboard -->
             <div class="form-group">
-                <label class="form-label">Receipt Brand Color</label>
+                <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Receipt Brand Color</span>
+                    <span id="selected_color_label" style="font-size: 0.78rem; font-weight: 700; color: #5A6B87; text-transform: none; font-family: monospace;">#FF6A13</span>
+                </label>
+                <!-- Hidden input carrying the effective brand color -->
+                <input type="hidden" name="brand_color" id="effective_brand_color" value="#FF6A13">
+
                 <div class="color-selector">
-                    <label class="color-option selected" style="background: #FF6A13;" title="Padi Orange">
-                        <input type="radio" name="brand_color" value="#FF6A13" checked>
+                    <label class="color-option selected" style="background: #FF6A13;" title="Padi Orange (Default)">
+                        <input type="radio" name="preset_color" value="#FF6A13" checked>
                     </label>
                     <label class="color-option" style="background: #0D1F45;" title="Padi Navy">
-                        <input type="radio" name="brand_color" value="#0D1F45">
+                        <input type="radio" name="preset_color" value="#0D1F45">
+                    </label>
+                    <label class="color-option" style="background: #D97706;" title="Sunshine Amber">
+                        <input type="radio" name="preset_color" value="#D97706">
                     </label>
                     <label class="color-option" style="background: #16A34A;" title="Forest Green">
-                        <input type="radio" name="brand_color" value="#16A34A">
+                        <input type="radio" name="preset_color" value="#16A34A">
+                    </label>
+                    <label class="color-option" style="background: #0D9488;" title="Teal">
+                        <input type="radio" name="preset_color" value="#0D9488">
                     </label>
                     <label class="color-option" style="background: #2563EB;" title="Royal Blue">
-                        <input type="radio" name="brand_color" value="#2563EB">
+                        <input type="radio" name="preset_color" value="#2563EB">
                     </label>
-                    <label class="color-option" style="background: #7C3AED;" title="Purple">
-                        <input type="radio" name="brand_color" value="#7C3AED">
+                    <label class="color-option" style="background: #7C3AED;" title="Royal Purple">
+                        <input type="radio" name="preset_color" value="#7C3AED">
                     </label>
+                    <label class="color-option" style="background: #DC2626;" title="Crimson Red">
+                        <input type="radio" name="preset_color" value="#DC2626">
+                    </label>
+                    <label class="color-option" style="background: #E11D48;" title="Rose Pink">
+                        <input type="radio" name="preset_color" value="#E11D48">
+                    </label>
+                    <label class="color-option" style="background: #334155;" title="Slate Charcoal">
+                        <input type="radio" name="preset_color" value="#334155">
+                    </label>
+
+                    <!-- Native Custom Color Picker (Pick ANY color) -->
+                    <div class="custom-color-picker-wrap" id="custom_picker_wrap" title="Click to choose ANY custom brand color">
+                        <input type="color" id="native_color_picker" value="#FF6A13">
+                        <span class="custom-hex-text">Custom Color</span>
+                    </div>
                 </div>
             </div>
 
@@ -348,12 +437,52 @@
     </div>
 
     <script>
-        // Update selected color border
-        document.querySelectorAll('.color-option input').forEach(input => {
+        // Toggle Custom Business Category
+        function checkCategoryOthers(selectElem) {
+            const wrap = document.getElementById('custom_category_group');
+            const input = document.getElementById('custom_category_input');
+            if (selectElem.value === 'Others') {
+                wrap.style.display = 'block';
+                input.focus();
+                input.required = true;
+            } else {
+                wrap.style.display = 'none';
+                input.required = false;
+                input.value = '';
+            }
+        }
+
+        // Color Selection Logic: presets + native color picker
+        const effectiveInput = document.getElementById('effective_brand_color');
+        const colorLabel = document.getElementById('selected_color_label');
+        const nativePicker = document.getElementById('native_color_picker');
+        const customWrap = document.getElementById('custom_picker_wrap');
+        const presetOptions = document.querySelectorAll('.color-option');
+
+        // Preset circles
+        presetOptions.forEach(opt => {
+            const input = opt.querySelector('input');
             input.addEventListener('change', () => {
-                document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
-                input.parentElement.classList.add('selected');
+                presetOptions.forEach(el => el.classList.remove('selected'));
+                opt.classList.add('selected');
+                customWrap.style.borderColor = 'var(--padi-border)';
+                customWrap.style.background = '#F8FAFC';
+
+                effectiveInput.value = input.value;
+                colorLabel.textContent = input.value;
+                nativePicker.value = input.value;
             });
+        });
+
+        // Native Color Picker input (Allows picking ANY color)
+        nativePicker.addEventListener('input', (e) => {
+            const val = e.target.value.toUpperCase();
+            presetOptions.forEach(el => el.classList.remove('selected'));
+            customWrap.style.borderColor = 'var(--padi-navy)';
+            customWrap.style.background = 'var(--padi-cream)';
+
+            effectiveInput.value = val;
+            colorLabel.textContent = val;
         });
     </script>
 </body>
