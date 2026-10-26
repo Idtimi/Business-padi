@@ -261,29 +261,66 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         session.commit()
 
         prompt = (
-            "Pick a brand colour for your receipts:"
+            "Pick a brand colour for your receipts:\n\n"
+            "[1] Orange (Default #FF6A13)\n"
+            "[2] Navy Blue (#0D1F45)\n"
+            "[3] Forest Green (#16A34A)\n"
+            "[4] Gold / Amber (#D97706)\n"
+            "[5] Teal (#0D9488)\n"
+            "[6] Royal Blue (#2563EB)\n"
+            "[7] Royal Purple (#7C3AED)\n"
+            "[8] Crimson Red (#DC2626)\n"
+            "[9] Rose Pink (#E11D48)\n"
+            "[10] Slate Charcoal (#334155)\n\n"
+            "Reply with a number (1-10), a color name (e.g. 'Purple', 'Gold', 'Teal'), or any custom hex code (e.g. '#7C3AED')."
             if not is_pidgin else
-            "Pick a color for your receipts:"
+            "Pick a color for your receipts:\n\n"
+            "[1] Orange (Default #FF6A13)\n"
+            "[2] Navy Blue (#0D1F45)\n"
+            "[3] Forest Green (#16A34A)\n"
+            "[4] Gold / Amber (#D97706)\n"
+            "[5] Teal (#0D9488)\n"
+            "[6] Royal Blue (#2563EB)\n"
+            "[7] Royal Purple (#7C3AED)\n"
+            "[8] Crimson Red (#DC2626)\n"
+            "[9] Rose Pink (#E11D48)\n"
+            "[10] Slate Charcoal (#334155)\n\n"
+            "Reply with number (1-10), color name (e.g. 'Purple', 'Gold', 'Teal'), or any hex code (e.g. '#7C3AED')."
         )
-        buttons = [("color:orange", "Orange"), ("color:green", "Green"), ("color:blue", "Blue")]
-        return [Reply(prompt, buttons=buttons, kind="confirm")]
+        return [Reply(prompt)]
 
     # State: BRAND_COLOR
     if user.state == "BRAND_COLOR":
         biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
-        color = "#FF6A13"
         t_clean = text.lower().strip()
+
+        PALETTE = {
+            "1": "#FF6A13", "orange": "#FF6A13",
+            "2": "#0D1F45", "navy": "#0D1F45", "navy blue": "#0D1F45",
+            "3": "#16A34A", "green": "#16A34A", "forest green": "#16A34A",
+            "4": "#D97706", "gold": "#D97706", "amber": "#D97706", "yellow": "#D97706",
+            "5": "#0D9488", "teal": "#0D9488", "cyan": "#0D9488",
+            "6": "#2563EB", "blue": "#2563EB", "royal blue": "#2563EB",
+            "7": "#7C3AED", "purple": "#7C3AED", "violet": "#7C3AED",
+            "8": "#DC2626", "red": "#DC2626", "crimson": "#DC2626",
+            "9": "#E11D48", "pink": "#E11D48", "rose": "#E11D48",
+            "10": "#334155", "black": "#334155", "charcoal": "#334155", "slate": "#334155",
+            "brown": "#78350F", "maroon": "#831843", "wine": "#831843",
+        }
+
         if btn.startswith("color:"):
-            cname = btn.split(":", 1)[1]
-            color = "#0B8457" if cname == "green" else ("#0D1F45" if cname == "blue" else "#FF6A13")
-        elif t_clean in ("1", "orange"):
-            color = "#FF6A13"
-        elif t_clean in ("2", "green"):
-            color = "#0B8457"
-        elif t_clean in ("3", "blue"):
-            color = "#0D1F45"
+            cname = btn.split(":", 1)[1].lower()
+            color = PALETTE.get(cname, "#FF6A13")
+        elif t_clean in PALETTE:
+            color = PALETTE[t_clean]
+        elif t_clean.startswith("#") and len(t_clean) in (4, 7):
+            color = t_clean.upper()
+        elif len(t_clean) == 6 and all(c in "0123456789abcdefABCDEF" for c in t_clean):
+            color = f"#{t_clean.upper()}"
         elif text:
             color = text.strip()
+        else:
+            color = "#FF6A13"
 
         if biz:
             biz.brand_color = color
@@ -292,9 +329,9 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         session.commit()
 
         prompt = (
-            "Shop address and phone for your receipts? [Skip]"
+            f"Brand color set to {color}. Shop address and phone for your receipts? [Skip]"
             if not is_pidgin else
-            "Shop address and phone for your receipts? [Skip]"
+            f"Color set to {color}. Shop address and phone for your receipts? [Skip]"
         )
         buttons = [("contact:skip", "Skip")]
         return [Reply(prompt, buttons=buttons, kind="confirm")]
