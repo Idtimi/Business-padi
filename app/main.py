@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import text
 
@@ -63,6 +63,17 @@ def readiness():
             {"status": "unhealthy", "database": "disconnected", "error": str(e)},
             status_code=503,
         )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    accept = request.headers.get("accept", "")
+    if exc.status_code == 401 and request.url.path.startswith("/d") and "text/html" in accept:
+        return RedirectResponse(url="/d/login", status_code=303)
+    return JSONResponse(
+        {"detail": exc.detail},
+        status_code=exc.status_code,
+    )
 
 
 @app.exception_handler(Exception)
