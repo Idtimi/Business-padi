@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str = ""
     graph_api_version: str = "v20.0"
 
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_number: str = "whatsapp:+14155238886"
+
     asr_provider: str = "mock"
     asr_model: str = ""
     asr_api_key: str = ""

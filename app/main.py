@@ -9,6 +9,7 @@ from app.dashboard_routes import router as dashboard_router
 from app.db import Base, engine, SessionLocal
 from app.logging_conf import setup_logging
 from app.profile_routes import router as profile_router
+from app.twilio_routes import router as twilio_router
 from app.whatsapp_routes import router as whatsapp_router
 import app.models as m
 
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Business Padi", lifespan=lifespan)
 app.include_router(whatsapp_router)
+app.include_router(twilio_router)
 app.include_router(dashboard_router, prefix="/d")
 app.include_router(profile_router)
 
