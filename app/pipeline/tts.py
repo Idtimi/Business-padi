@@ -68,9 +68,49 @@ class TTSClient:
             return b"OggS\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00MOCK_AUDIO_DATA"
 
         if self.provider == "yarngpt":
-            # Real YarnGPT integration / fallback
-            log.info("Synthesizing speech via YarnGPT (voice=%s, lang=%s): '%s'", voice, language, text[:30])
-            # Return synthetic payload when running without local GPU/cloud API key
+            key = getattr(settings, "yarngpt_api_key", None)
+            if not key:
+                log.info("No YarnGPT key provided; using fallback mock audio")
+                return b"OggS\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00YARNGPT_AUDIO"
+            try:
+                import time
+                import uuid
+                import httpx
+
+                log.info("Synthesizing speech via live YarnGPT (voice=%s, lang=%s): '%s'", voice, language, text[:30])
+                headers = {
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                    "Idempotency-Key": str(uuid.uuid4()),
+                }
+                payload = {
+                    "text": text.strip(),
+                    "voice": voice,
+                }
+                res = httpx.post("https://api.yarngpt.ai/api/v1/tts", json=payload, headers=headers, timeout=20.0)
+                if res.status_code == 202:
+                    data = res.json()
+                    job_id = data.get("job_id")
+                    if job_id:
+                        status_headers = {"Authorization": f"Bearer {key}"}
+                        for _ in range(8):
+                            time.sleep(1.5)
+                            st_res = httpx.get(f"https://api.yarngpt.ai/api/v1/status/{job_id}", headers=status_headers, timeout=10.0)
+                            if st_res.status_code == 200:
+                                st_data = st_res.json()
+                                if st_data.get("status") == "completed":
+                                    audio_url = st_data.get("audio_url")
+                                    if audio_url:
+                                        dl = httpx.get(audio_url, timeout=20.0)
+                                        if dl.status_code == 200 and dl.content:
+                                            return dl.content
+                                elif st_data.get("status") == "failed":
+                                    log.warning("YarnGPT TTS failed: %s", st_data)
+                                    break
+                else:
+                    log.warning("YarnGPT TTS submission error [%s]: %s", res.status_code, res.text[:200])
+            except Exception as e:
+                log.exception("YarnGPT synthesis exception: %s", e)
             return b"OggS\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00YARNGPT_AUDIO"
 
         return b""

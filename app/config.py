@@ -20,13 +20,14 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_whatsapp_number: str = "whatsapp:+14155238886"
 
-    asr_provider: str = "mock"
+    asr_provider: str = "yarngpt"
     asr_model: str = ""
     asr_api_key: str = ""
     llm_provider: str = "mock"
     llm_model: str = ""
     llm_api_key: str = ""
-    tts_provider: str = "none"
+    tts_provider: str = "yarngpt"
+    yarngpt_api_key: str = "sk_live_10ypR9T5hMJkcyCK.auXXCXsSJjMSN7RUjsqjTSHULCFs56OtrEZVgegBOwQ"
 
     languages_enabled: str = "pcm,en,yo,ha,ig"
     asr_provider_by_lang: str = ""
