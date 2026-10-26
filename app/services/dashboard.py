@@ -29,8 +29,8 @@ from app.services import ledger, plans
 log = logging.getLogger(__name__)
 
 SESSION_COOKIE_NAME = "vl_session"
-DEFAULT_EXPIRY_MINUTES = 15
-DEFAULT_SESSION_HOURS = 24
+DEFAULT_EXPIRY_MINUTES = 60 * 24 * 30  # 30 days direct access
+DEFAULT_SESSION_HOURS = 24 * 30  # 30 days persistent login
 
 
 def _get_secret() -> str:
@@ -128,7 +128,7 @@ def verify_magic_token(session: Session, raw_token: str) -> tuple[bool, str, Pen
                 expected_sig = hmac.new(secret.encode(), data.encode(), hashlib.sha256).hexdigest()
                 if hmac.compare_digest(sig, expected_sig[:24]):
                     if time.time() > exp_ts:
-                        return False, "This login link has expired. Please request a new one via WhatsApp.", None
+                        return False, "This login link has expired. Please request a new link with /dashboard.", None
                     action = PendingAction(
                         business_id=biz_id,
                         user_id=user_id,

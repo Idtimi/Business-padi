@@ -313,6 +313,41 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return [Reply(rep_text)]
 
+    # Help and all commands guide
+    if lower in ("/commands", "commands", "/help", "help", "/menu", "menu"):
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        cmd_text = (
+            "BUSINESS PADI - ALL COMMANDS\n\n"
+            "RECORD KEEPING (Voice & Text)\n"
+            "- Voice Note: Speak naturally in English, Pidgin, Yoruba, Hausa, or Igbo.\n"
+            "- Cash Sale: \"Sold 3 bags rice for 120k cash\"\n"
+            "- Credit Sale: \"Sold 2 bags rice to Tunde for 80k, he owes 30k\"\n"
+            "- Customer Payment: \"Tunde paid 30k\"\n"
+            "- Expense: \"Paid 15k for generator fuel\"\n\n"
+            "RECEIPTS & DOCUMENTS\n"
+            "/receipt - Download PDF receipt for latest sale + send to customer\n"
+            "/invoice - Generate PDF invoice for customer orders\n\n"
+            "WEB DASHBOARD\n"
+            "/dashboard (or /login) - Get direct link to your shop's web dashboard\n\n"
+            "DEBTS & REPORTS\n"
+            "/debtors (or \"who dey owe\") - View all customers owing money & total debt\n"
+            "/report (or /today) - Today's sales summary, cash collected, and profit\n\n"
+            "SETTINGS & PREFERENCES\n"
+            "/language - Change UI language or Voice transcription language\n"
+            "/settings - View shop profile (name, brand color, address, bank)\n"
+            "/settings name <New Name> - Change your shop name\n"
+            "/settings color <#hex or color> - Change receipt brand color\n"
+            "/settings address <Address> - Set your shop physical address\n"
+            "/settings bank <Bank Details> - Set bank details printed on receipts\n"
+            "/start (or /setup) - Restart onboarding setup anytime\n\n"
+            "TEAM & SUBSCRIPTION\n"
+            "/staff - View active shop attendants\n"
+            "/invite_staff - Generate a 24hr invite code for a shop attendant\n"
+            "/plan - Check your subscription tier (Starter, Trader, Business) or upgrade"
+        )
+        return [Reply(cmd_text)]
+
     # Dashboard magic link command
     if any(lower == k or lower.startswith(k + " ") for k in ("/dashboard", "dashboard", "/login", "login")):
         if biz is None:
@@ -327,8 +362,12 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         _, link_url = dashboard.generate_magic_link(session, user_id, biz.id)
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         session.commit()
-        demo_url = f"{settings.base_url.rstrip('/')}/d/login/demo"
-        return [Reply(f"Here is your secure link to access the shop dashboard:\n{link_url}\n\nThis link expires in 15 minutes.\n\nOr click here for instant 1-click evaluation access:\n{demo_url}")]
+        return [Reply(
+            f"Here is your direct access link to your {biz.name} dashboard:\n\n"
+            f"{link_url}\n\n"
+            f"This link expires in 15 minutes.\n"
+            f"Tap to view live sales charts, customer ledgers, inventory, and export reports."
+        )]
 
     # Check if user is replying with a phone number for pending receipt
     user = session.get(User, user_id)
@@ -380,6 +419,36 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         session.commit()
         return handle_button(session, business_id, user_id, "get_receipt", lang=lang)
+
+    # Debtors query command
+    if lower in ("/debtors", "debtors", "/debts", "debts", "/debt", "debt") and biz:
+        from app.services import reports
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        ans = reports.run_query(session, business_id, "top_debtor", {}, lang, today, llm=llm)
+        return [Reply(ans)]
+
+    # Sales & Profit report command
+    if lower in ("/report", "report", "/summary", "summary", "/sales", "sales", "/today", "today") and biz:
+        from app.services import reports
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        ans = reports.run_query(session, business_id, "profit_period", {"period": "today"}, lang, today, llm=llm)
+        return [Reply(ans)]
+
+    # Staff list command
+    if lower in ("/staff", "staff", "/team", "team") and biz:
+        from app.services import staff
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        members = staff.list_staff(session, business_id)
+        if not members:
+            return [Reply(
+                f"You currently have no attendants registered for {biz.name}.\n\n"
+                f"Type /invite_staff to generate an invite code for your shop staff."
+            )]
+        lines = [f"- {m.role.title()}: {m.name or 'Staff'} ({m.phone or 'Active'})" for m in members]
+        return [Reply(f"Team members for {biz.name}:\n" + "\n".join(lines) + "\n\nType /invite_staff to add an attendant.")]
 
     # Financial trade profile command
     if lower in ("/profile", "profile", "/trade_profile", "trade profile") and biz:

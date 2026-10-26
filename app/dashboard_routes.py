@@ -59,7 +59,7 @@ def get_current_user_and_biz(
             )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Dashboard session invalid or expired. Please request a new login link via WhatsApp or Telegram.",
+            detail="Dashboard session invalid or expired. Please type /dashboard in chat to get a new direct login link.",
         )
     user_id, biz_id = res
     user = db.get(User, user_id)
