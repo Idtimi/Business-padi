@@ -56,6 +56,85 @@ class MockLLM:
                     "query": {"type": "profit_period", "params": {"period": "today"}},
                 }],
             }
+
+        # Rule-based fallback parsing for natural trade sentences
+        import re
+
+        # 1. Sales (sell / sold)
+        if "sell" in user_norm or "sold" in user_norm:
+            m_qty = re.search(r'\b(\d+)\s*(bag|carton|sachet|piece|unit|kg)?s?\b', user_norm)
+            qty = int(m_qty.group(1)) if m_qty else 1
+            unit = m_qty.group(2) if (m_qty and m_qty.group(2)) else "unit"
+
+            m_item = re.search(r'\b(rice|beans|indomie|garri|oil|sugar|fuel|cement|milo|yam|provisions|bread|eggs)\b', user_norm)
+            item = m_item.group(1) if m_item else "goods"
+
+            # Parse amount token (distinguishing from qty)
+            all_numbers = re.findall(r'(\b\d[\d,]*k?\b)', user_norm)
+            amt_tokens = [n for n in all_numbers if n != str(qty)]
+            amt_str = amt_tokens[0] if amt_tokens else "0"
+            amt_str = amt_str.replace(",", "").lower()
+            if amt_str.endswith("k"):
+                total_amt = int(float(amt_str[:-1]) * 1000)
+            else:
+                total_amt = int(amt_str) if amt_str.isdigit() else 0
+
+            m_cust = re.search(r'(?:to|give)\s+([a-zA-Z]+)', user_norm)
+            cust = m_cust.group(1).title() if m_cust else "Customer"
+
+            return {
+                "language_detected": "english",
+                "transactions": [{
+                    "intent": "sale",
+                    "customer": cust,
+                    "items": [{
+                        "name": item,
+                        "qty": qty,
+                        "unit": unit,
+                        "unit_price": int(total_amt / qty) if qty else total_amt,
+                    }],
+                    "payment": "cash",
+                    "amount_paid": total_amt,
+                }],
+            }
+
+        # 2. Customer Repayment (paid / don pay)
+        if "paid" in user_norm or "don pay" in user_norm:
+            m_amt = re.search(r'\b(\d[\d,]*k?)\b', user_norm)
+            amt = 0
+            if m_amt:
+                raw_amt = m_amt.group(1).replace(",", "")
+                amt = int(float(raw_amt[:-1]) * 1000) if raw_amt.endswith("k") else (int(raw_amt) if raw_amt.isdigit() else 0)
+
+            m_cust = re.search(r'([a-zA-Z\s]+?)\s+(?:paid|don pay)', user_norm)
+            cust = m_cust.group(1).strip().title() if m_cust else "Customer"
+
+            return {
+                "language_detected": "english",
+                "transactions": [{
+                    "intent": "payment_received",
+                    "customer": cust,
+                    "amount": amt,
+                }],
+            }
+
+        # 3. Expenses (buy fuel, expense, paid rent)
+        if "fuel" in user_norm or "expense" in user_norm or "rent" in user_norm:
+            m_amt = re.search(r'\b(\d[\d,]*k?)\b', user_norm)
+            amt = 0
+            if m_amt:
+                raw_amt = m_amt.group(1).replace(",", "")
+                amt = int(float(raw_amt[:-1]) * 1000) if raw_amt.endswith("k") else (int(raw_amt) if raw_amt.isdigit() else 0)
+            category = "fuel" if "fuel" in user_norm else ("rent" if "rent" in user_norm else "general")
+            return {
+                "language_detected": "english",
+                "transactions": [{
+                    "intent": "expense",
+                    "category": category,
+                    "amount": amt,
+                }],
+            }
+
         return {
             "language_detected": "unknown",
             "transactions": [{
