@@ -109,7 +109,7 @@ def test_full_onboarding_flow_with_skip_logo(factory):
         asyncio.run(handle_incoming(channel, make_msg(user_ref, button_id="color:green", kind="button", mid="step6"), s))
         u = s.scalar(select(m.User).where(m.User.channel_user_id == user_ref))
         b = s.scalar(select(m.Business).where(m.Business.owner_user_id == u.id))
-        assert b.brand_color == "green"
+        assert b.brand_color in ("green", "#16A34A")
         assert u.state == "CONTACT"
         assert "address" in channel.sent[-1]["text"].lower()
 

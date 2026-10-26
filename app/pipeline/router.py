@@ -4,6 +4,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.i18n import t
 from app.models import Business, Customer, PendingAction, ProcessedMessage, Transaction, User
 from app.money import fmt_naira
@@ -311,12 +312,21 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         return [Reply(rep_text)]
 
     # Dashboard magic link command
-    if lower in ("/dashboard", "dashboard", "/login", "login") and biz:
+    if any(lower == k or lower.startswith(k + " ") for k in ("/dashboard", "dashboard", "/login", "login")):
+        if biz is None:
+            biz = session.scalar(select(Business).where(Business.owner_user_id == user_id))
+            if biz is None:
+                user = session.get(User, user_id)
+                shop_name = f"Shop {user.channel_user_id[-4:] if user else user_id}"
+                biz = Business(owner_user_id=user_id, name=shop_name)
+                session.add(biz)
+                session.commit()
         from app.services import dashboard
-        _, link_url = dashboard.generate_magic_link(session, user_id, business_id)
+        _, link_url = dashboard.generate_magic_link(session, user_id, biz.id)
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         session.commit()
-        return [Reply(f"Here is your secure link to access the shop dashboard:\n{link_url}\n\nThis link expires in 15 minutes.")]
+        demo_url = f"{settings.base_url.rstrip('/')}/d/login/demo"
+        return [Reply(f"Here is your secure link to access the shop dashboard:\n{link_url}\n\nThis link expires in 15 minutes.\n\nOr click here for instant 1-click evaluation access:\n{demo_url}")]
 
     # Financial trade profile command
     if lower in ("/profile", "profile", "/trade_profile", "trade profile") and biz:
@@ -426,6 +436,47 @@ def _saved_text(session, business_id, tx, lang) -> str:
 
 def handle_button(session: Session, business_id: int, user_id: int, action: str,
                   pending_id: int = 0, lang: str = "en") -> list[Reply]:
+    # Language change interactive buttons
+    if action == "cmd_lang_ui":
+        buttons = [
+            ("set_ui_en", "English"),
+            ("set_ui_pcm", "Nigerian Pidgin"),
+            ("set_ui_yo", "Yorùbá"),
+            ("set_ui_ha", "Hausa"),
+            ("set_ui_ig", "Ìgbò"),
+        ]
+        return [Reply("Select your preferred UI language:", buttons=buttons)]
+
+    if action == "cmd_lang_speech":
+        buttons = [
+            ("set_speech_en", "English"),
+            ("set_speech_pcm", "Nigerian Pidgin"),
+            ("set_speech_yo", "Yorùbá"),
+            ("set_speech_ha", "Hausa"),
+            ("set_speech_ig", "Ìgbò"),
+        ]
+        return [Reply("Select your preferred Voice language:", buttons=buttons)]
+
+    if action.startswith("set_ui_"):
+        code = action.replace("set_ui_", "")
+        user = session.get(User, user_id)
+        if user:
+            user.language = code
+            session.commit()
+        from config.languages import get_language
+        return [Reply(f"UI language updated to {get_language(code)['name']}.")]
+
+    if action.startswith("set_speech_"):
+        code = action.replace("set_speech_", "")
+        user = session.get(User, user_id)
+        if user:
+            st = dict(user.state_data or {})
+            st["speech_language"] = code
+            user.state_data = st
+            session.commit()
+        from config.languages import get_language
+        return [Reply(f"Voice language updated to {get_language(code)['name']}.")]
+
     # Staff transaction approval buttons
     if action == "approve_tx":
         from app.services import staff

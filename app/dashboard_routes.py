@@ -59,11 +59,17 @@ def get_current_user_and_biz(
             )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Dashboard session invalid or expired. Please request a new login link via WhatsApp.",
+            detail="Dashboard session invalid or expired. Please request a new login link via WhatsApp or Telegram.",
         )
     user_id, biz_id = res
     user = db.get(User, user_id)
     biz = db.get(Business, biz_id)
+    if user is not None and biz is None:
+        biz = db.scalar(select(Business).where(Business.owner_user_id == user.id))
+        if biz is None:
+            biz = Business(owner_user_id=user.id, name=f"Shop {user.channel_user_id[-4:]}")
+            db.add(biz)
+            db.commit()
     if user is None or biz is None:
         accept = request.headers.get("accept", "")
         if "text/html" in accept and not accept.startswith("*/*"):
@@ -85,6 +91,16 @@ def get_current_user_and_biz(
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, token: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
     if token:
+        ua = request.headers.get("user-agent", "").lower()
+        crawler_signatures = ("telegrambot", "twitterbot", "facebookexternalhit", "whatsapp", "slackbot", "linkedinbot", "discordbot")
+        if any(bot in ua for bot in crawler_signatures):
+            return HTMLResponse(
+                "<!DOCTYPE html><html><head><title>Business Padi Dashboard</title>"
+                "<meta property='og:title' content='Business Padi Dashboard'>"
+                "<meta property='og:description' content='Login to Business Padi Shop Dashboard'>"
+                "</head><body>Business Padi Dashboard</body></html>"
+            )
+
         ok, msg, action = dashboard.verify_magic_token(db, token)
         if not ok or action is None:
             return templates.TemplateResponse(

@@ -105,7 +105,7 @@ def verify_magic_token(session: Session, raw_token: str) -> tuple[bool, str, Pen
                 if now > exp_dt:
                     matched_action.status = "expired"
                     session.commit()
-                    return False, "This login link has expired. Please request a new one via WhatsApp.", None
+                    return False, "This login link has expired. Please request a new one.", None
             except Exception:
                 log.exception("Error checking token expiration")
 
