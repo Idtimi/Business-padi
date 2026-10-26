@@ -72,6 +72,7 @@ def handle_settings_command(session: Session, user: User, biz: Business | None,
         logo_status = "Uploaded" if biz.logo_path else "None"
         msg = (
             f"Shop Settings:\n"
+            f"- Language: {user.language or 'en'}\n"
             f"- Name: {biz.name or 'Not set'}\n"
             f"- Color: {biz.brand_color or 'Not set'}\n"
             f"- Address: {biz.address or 'Not set'}\n"
@@ -80,6 +81,7 @@ def handle_settings_command(session: Session, user: User, biz: Business | None,
             f"- Footer: {biz.footer_note or 'Not set'}\n"
             f"- Logo: {logo_status}\n\n"
             f"To update, type e.g.:\n"
+            f"/settings lang <en/pcm>\n"
             f"/settings name <new name>\n"
             f"/settings color <color>\n"
             f"/settings address <address>\n"
@@ -92,22 +94,47 @@ def handle_settings_command(session: Session, user: User, biz: Business | None,
     subcmd = parts[1].lower()
     val = parts[2].strip() if len(parts) > 2 else ""
 
-    if subcmd == "name" and val:
-        biz.name = val
+    if subcmd in ("lang", "language") and val:
+        raw_l = val.strip("<> ").lower()
+        lang_map = {
+            "en": "en", "english": "en",
+            "pcm": "pcm", "pidgin": "pcm",
+            "yo": "yo", "yoruba": "yo",
+            "ha": "ha", "hausa": "ha",
+            "ig": "ig", "igbo": "ig",
+        }
+        chosen = lang_map.get(raw_l, raw_l)
+        user.language = chosen
         session.commit()
-        return Reply(f"Shop name updated to {val}.")
+        return Reply(f"Language updated to {chosen}.")
+    elif subcmd == "name" and val:
+        clean_name = val.strip("<> ")
+        biz.name = clean_name
+        session.commit()
+        return Reply(f"Shop name updated to {clean_name}.")
     elif subcmd == "color" and val:
-        biz.brand_color = val
+        c_clean = val.strip("<> ").lower()
+        PALETTE = {
+            "orange": "#FF6A13", "navy": "#0D1F45", "blue": "#0D1F45",
+            "green": "#16A34A", "gold": "#D97706", "amber": "#D97706",
+            "teal": "#0D9488", "royal blue": "#2563EB", "purple": "#7C3AED",
+            "red": "#DC2626", "pink": "#E11D48", "black": "#1E293B",
+            "charcoal": "#334155", "slate": "#334155", "maroon": "#831843",
+        }
+        effective_color = PALETTE.get(c_clean, val.strip("<> "))
+        biz.brand_color = effective_color
         session.commit()
-        return Reply(f"Brand color updated to {val}.")
+        return Reply(f"Brand color updated to {effective_color}.")
     elif subcmd == "address" and val:
-        biz.address = val
+        clean_addr = val.strip("<> ")
+        biz.address = clean_addr
         session.commit()
-        return Reply(f"Shop address updated to {val}.")
+        return Reply(f"Shop address updated to {clean_addr}.")
     elif subcmd == "phone" and val:
-        biz.phone = val
+        clean_ph = val.strip("<> ")
+        biz.phone = clean_ph
         session.commit()
-        return Reply(f"Shop phone updated to {val}.")
+        return Reply(f"Shop phone updated to {clean_ph}.")
     elif subcmd == "bank" and val:
         biz.bank_details = val
         session.commit()

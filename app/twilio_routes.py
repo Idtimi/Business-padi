@@ -113,8 +113,14 @@ async def receive_twilio_webhook(
     channel = TwilioReplyCollector()
     with SessionLocal() as session:
         try:
-            # Look up or create user
-            user = session.query(User).filter(User.channel_user_id == clean_sender).first()
+            # Look up or create user (check both with and without leading +)
+            variants = [clean_sender]
+            if clean_sender.startswith("+"):
+                variants.append(clean_sender.lstrip("+"))
+            else:
+                variants.append(f"+{clean_sender}")
+
+            user = session.query(User).filter(User.channel_user_id.in_(variants)).first()
             if user is None:
                 # Brand new user begins with company onboarding & language choice
                 user = User(

@@ -29,6 +29,61 @@ async def lifespan(app: FastAPI):
                 from scripts.seed_demo import seed_demo_data
                 seed_demo_data(reset=False)
                 log.info("Initialized schema and seeded Mama Ngozi Provisions demo shop.")
+
+            # Ensure primary merchant user (+2348164802550) is permanently provisioned
+            primary_phones = ["+2348164802550", "2348164802550"]
+            for phone in primary_phones:
+                existing_user = db.query(m.User).filter_by(channel_user_id=phone).first()
+                if not existing_user:
+                    u = m.User(
+                        channel="whatsapp",
+                        channel_user_id=phone,
+                        display_name="Merchant",
+                        language="en",
+                        state="DONE",
+                        created_at=m.now_iso(),
+                    )
+                    db.add(u)
+                    db.flush()
+                    b = m.Business(
+                        owner_user_id=u.id,
+                        name="Business Padi Store",
+                        phone=phone,
+                        brand_color="#1E293B",
+                        plan="trader",
+                        created_at=m.now_iso(),
+                    )
+                    db.add(b)
+                    db.flush()
+                    for k in ("receipt", "invoice", "statement", "quote"):
+                        db.add(m.DocCounter(business_id=b.id, kind=k, last_no=0))
+                    db.commit()
+                    log.info("Seeded primary user %s with trader business.", phone)
+                else:
+                    updated = False
+                    if existing_user.state != "DONE":
+                        existing_user.state = "DONE"
+                        updated = True
+                    if existing_user.language != "en":
+                        existing_user.language = "en"
+                        updated = True
+                    existing_biz = db.query(m.Business).filter_by(owner_user_id=existing_user.id).first()
+                    if not existing_biz:
+                        b = m.Business(
+                            owner_user_id=existing_user.id,
+                            name="Business Padi Store",
+                            phone=phone,
+                            brand_color="#1E293B",
+                            plan="trader",
+                            created_at=m.now_iso(),
+                        )
+                        db.add(b)
+                        db.flush()
+                        for k in ("receipt", "invoice", "statement", "quote"):
+                            db.add(m.DocCounter(business_id=b.id, kind=k, last_no=0))
+                        updated = True
+                    if updated:
+                        db.commit()
         except Exception as e:
             log.exception("Automatic schema / demo initialization error: %s", str(e))
     yield

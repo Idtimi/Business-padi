@@ -24,8 +24,16 @@ def mask(ref: str) -> str:
 
 def resolve_identity(session: Session, msg: IncomingMessage) -> tuple[User, Business | None]:
     """Resolve user and their business. If user doesn't exist, create in NEW state."""
-    user = session.scalar(select(User).where(
-        User.channel == msg.channel, User.channel_user_id == msg.user_ref))
+    ref = (msg.user_ref or "").strip()
+    variants = [ref]
+    if ref.startswith("+"):
+        variants.append(ref.lstrip("+"))
+    else:
+        variants.append(f"+{ref}")
+
+    user = session.scalar(
+        select(User).where(User.channel == msg.channel, User.channel_user_id.in_(variants))
+    )
     if user is None:
         user = User(channel=msg.channel, channel_user_id=msg.user_ref,
                     language=settings.default_language, state="NEW")
@@ -186,7 +194,33 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         await _send_all(channel, session, biz, msg.user_ref, replies)
         return
 
-    # 1. State machine: if user has not completed onboarding, route to onboarding
+    # 1. Check for settings commands upfront
+    if msg.kind == "text" and text.lower().startswith("/settings"):
+        if user.state != "DONE":
+            user.state = "DONE"
+            session.commit()
+        if biz is None:
+            from app.models import DocCounter, now_iso
+            biz = Business(
+                owner_user_id=user.id,
+                name=f"Shop {msg.user_ref[-4:]}",
+                phone=msg.user_ref,
+                plan="starter",
+                created_at=now_iso(),
+            )
+            session.add(biz)
+            session.flush()
+            for k in ("receipt", "invoice", "statement", "quote"):
+                session.add(DocCounter(business_id=biz.id, kind=k, last_no=0))
+            session.commit()
+
+        replies = [onboarding.handle_settings_command(session, user, biz, text, user.language)]
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        await _send_all(channel, session, biz, msg.user_ref, replies)
+        return
+
+    # 2. State machine: if user has not completed onboarding, route to onboarding
     if user.state != "DONE":
         if msg.kind == "voice":
             replies = await _handle_voice(channel, session, biz, user, msg, asr=asr)
@@ -199,14 +233,7 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         await _send_all(channel, session, biz, msg.user_ref, replies)
         return
 
-    # 2. Onboarded users: check for settings and help commands
-    if msg.kind == "text" and text.lower().startswith("/settings"):
-        replies = [onboarding.handle_settings_command(session, user, biz, text, user.language)]
-        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
-        session.commit()
-        await _send_all(channel, session, biz, msg.user_ref, replies)
-        return
-
+    # 3. Help command
     if msg.kind == "text" and text.lower() == "help":
         replies = [router.Reply(onboarding.help_menu(user.language))]
         session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
@@ -214,7 +241,7 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         await _send_all(channel, session, biz, msg.user_ref, replies)
         return
 
-    # 3. Regular transaction and query flow
+    # 4. Regular transaction and query flow
     if msg.kind == "text":
         replies = router.handle_text(session, biz.id, user.id, text,
                                      msg.message_id, user.language, channel=msg.channel)
