@@ -22,7 +22,12 @@ class MockASR:
     def transcribe(self, wav_path: str, language_hint: str | None, glossary: list[str]) -> Transcript:
         p = Path(wav_path)
         sidecar = p.with_suffix(".txt")
-        text = sidecar.read_text(encoding="utf-8").strip() if sidecar.exists() else p.stem
+        if sidecar.exists():
+            text = sidecar.read_text(encoding="utf-8").strip()
+        elif p.stem.lower() in ("voice", "audio", "recording", "input"):
+            text = "I sell 2 bag of rice for 80,000 to Emeka and now e dey owe 40k"
+        else:
+            text = p.stem
         return Transcript(text=text, language=language_hint, confidence=1.0)
 
 

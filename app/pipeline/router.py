@@ -343,7 +343,9 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         return [Reply(msg_profile)]
 
     # Multi-language command: /language ui <code/name> or /language speech <code/name>
-    if lower in ("/language", "language", "/lang", "lang") or lower.startswith("/language ") or lower.startswith("language "):
+    if any(lower == k or lower.startswith(k + " ") for k in (
+        "/language", "language", "/lang", "lang", "change language", "change my language", "can i change my language"
+    )):
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         user = session.get(User, user_id)
         parts = lower.split()
@@ -377,6 +379,15 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         current_speech = (user.state_data or {}).get("speech_language", user.language) if user else lang
         buttons = [("cmd_lang_ui", "Change UI Lang"), ("cmd_lang_speech", "Change Voice Lang")]
         return [Reply(f"Current Settings:\n- UI Language: {lang}\n- Speech Language: {current_speech}\n\nTo change, send: /language ui <code/name> or /language speech <code/name>", buttons=buttons)]
+
+        # Shop info command
+    if any(k in lower for k in ("company name", "shop name", "my company", "my shop", "business name", "my business", "wetin be my")):
+        biz = session.get(Business, business_id)
+        if biz:
+            category = (biz.custom_fields or {}).get("category", "General Trade")
+            session.add(ProcessedMessage(channel=channel, message_id=message_id))
+            session.commit()
+            return [Reply(f"Shop Name: *{biz.name}*\nPhone: {biz.phone}\nPlan: {biz.plan.capitalize()}\nCategory: {category}")]
 
     clarify = _open_clarify(session, business_id, user_id)
     if clarify is not None:  # this message answers our earlier question

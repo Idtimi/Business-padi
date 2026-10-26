@@ -60,6 +60,16 @@ class MockLLM:
         # Rule-based fallback parsing for natural trade sentences
         import re
 
+        # Debtor queries
+        if any(w in user_norm for w in ("who dey owe", "who owe me", "who owe", "debtor", "person wey owe")):
+            return {
+                "language_detected": "pcm",
+                "transactions": [{
+                    "intent": "query",
+                    "query": {"type": "top_debtor", "params": {}},
+                }],
+            }
+
         # 1. Sales (sell / sold)
         if "sell" in user_norm or "sold" in user_norm:
             m_qty = re.search(r'\b(\d+)\s*(bag|carton|sachet|piece|unit|kg)?s?\b', user_norm)
@@ -69,15 +79,35 @@ class MockLLM:
             m_item = re.search(r'\b(rice|beans|indomie|garri|oil|sugar|fuel|cement|milo|yam|provisions|bread|eggs)\b', user_norm)
             item = m_item.group(1) if m_item else "goods"
 
-            # Parse amount token (distinguishing from qty)
+            # Check for debt / owe amount
+            m_owe = re.search(r'(?:owe|balance|remain)\s*(\d[\d,]*k?)', user_norm)
+            owe_val = 0
+            if m_owe:
+                raw_owe = m_owe.group(1).replace(",", "")
+                owe_val = int(float(raw_owe[:-1]) * 1000) if raw_owe.endswith("k") else (int(raw_owe) if raw_owe.isdigit() else 0)
+
+            # Parse total amount
             all_numbers = re.findall(r'(\b\d[\d,]*k?\b)', user_norm)
-            amt_tokens = [n for n in all_numbers if n != str(qty)]
-            amt_str = amt_tokens[0] if amt_tokens else "0"
-            amt_str = amt_str.replace(",", "").lower()
-            if amt_str.endswith("k"):
-                total_amt = int(float(amt_str[:-1]) * 1000)
+            amt_candidates = [n for n in all_numbers if n != str(qty)]
+            total_amt = 0
+            if amt_candidates:
+                raw_tot = amt_candidates[0].replace(",", "")
+                total_amt = int(float(raw_tot[:-1]) * 1000) if raw_tot.endswith("k") else (int(raw_tot) if raw_tot.isdigit() else 0)
+
+            # Determine payment & amount_paid
+            if "credit" in user_norm or "never pay" in user_norm or "no pay" in user_norm:
+                payment = "credit"
+                amount_paid = 0
+            elif owe_val > 0:
+                if owe_val >= total_amt:
+                    payment = "credit"
+                    amount_paid = 0
+                else:
+                    payment = "partial"
+                    amount_paid = total_amt - owe_val
             else:
-                total_amt = int(amt_str) if amt_str.isdigit() else 0
+                payment = "cash"
+                amount_paid = total_amt
 
             m_cust = re.search(r'(?:to|give)\s+([a-zA-Z]+)', user_norm)
             cust = m_cust.group(1).title() if m_cust else "Customer"
@@ -93,8 +123,8 @@ class MockLLM:
                         "unit": unit,
                         "unit_price": int(total_amt / qty) if qty else total_amt,
                     }],
-                    "payment": "cash",
-                    "amount_paid": total_amt,
+                    "payment": payment,
+                    "amount_paid": amount_paid,
                 }],
             }
 
