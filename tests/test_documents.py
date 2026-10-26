@@ -163,3 +163,52 @@ def test_acceptance_send_receipt_for_that_sale(session, tmp_path, monkeypatch):
     assert doc.total_kobo == to_kobo(127_500)
     assert doc.number == "R-0001"
     assert Path(doc.file_path).exists()
+
+
+def test_download_receipt_directly_then_ask_for_number(session, tmp_path, monkeypatch):
+    """Test flow: Record sale -> Download Receipt button -> PDF delivered + asks for customer phone -> Phone entered -> WhatsApp forward link generated."""
+    monkeypatch.setattr(documents, "MEDIA_DIR", tmp_path / "docs")
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    u, b = make_business(session, "Direct Receipt Shop")
+
+    # 1. Propose and save a sale
+    rep = router.handle_text(session, b.id, u.id, RICE, "m_sale_1", "en", llm=MockLLM())[0]
+    saved_replies = press(session, b, u, rep)
+    assert len(saved_replies) == 1
+    assert "Saved." in saved_replies[0].text
+    btn_ids = [btn[0] for btn in saved_replies[0].buttons]
+    assert any("get_receipt:" in bid for bid in btn_ids)
+
+    # 2. Press "Download Receipt"
+    receipt_btn = [btn for btn in saved_replies[0].buttons if "get_receipt:" in btn[0]][0]
+    action, pid = router.parse_button(receipt_btn[0])
+    receipt_replies = router.handle_button(session, b.id, u.id, action, pid, "en")
+    assert len(receipt_replies) == 2
+    doc_reply = receipt_replies[0]
+    assert doc_reply.document_path is not None
+    assert "/d/receipt/" in doc_reply.text
+    ask_reply = receipt_replies[1]
+    assert "phone number" in ask_reply.text.lower()
+    assert any("skip_receipt" in btn[0] for btn in ask_reply.buttons)
+
+    # Extract doc number
+    doc_number = doc_reply.text.split("/d/receipt/")[1].split()[0].strip()
+
+    # 3. Verify public download endpoint /d/receipt/{doc_number} works without login
+    import app.dashboard_routes as d_routes
+    from sqlalchemy.orm import sessionmaker
+    factory = sessionmaker(bind=session.get_bind(), expire_on_commit=False)
+    monkeypatch.setattr(d_routes, "SessionLocal", factory)
+    client = TestClient(app)
+    res = client.get(f"/d/receipt/{doc_number}")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/pdf"
+    assert len(res.content) > 100
+
+    # 4. Trader enters customer's phone number
+    phone_reply = router.handle_text(session, b.id, u.id, "08031234567", "m_phone_1", "en")
+    assert len(phone_reply) == 1
+    assert "Phone number saved" in phone_reply[0].text
+    assert "wa.me/2348031234567" in phone_reply[0].text

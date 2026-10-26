@@ -123,6 +123,57 @@ def login_page(request: Request, token: str | None = None, error: str | None = N
     return templates.TemplateResponse(request, "login.html", {"error": error})
 
 
+@router.get("/receipt/{doc_number}")
+@router.get("/receipt/{doc_number}.pdf")
+def public_download_receipt(doc_number: str, db: Session = Depends(get_db)):
+    clean_no = doc_number.upper().replace(".PDF", "").strip()
+    doc = db.scalar(select(Document).where(Document.number == clean_no))
+    if doc is None or doc.status == "cancelled":
+        raise HTTPException(status_code=404, detail="Receipt not found.")
+
+    if doc.file_path and os.path.exists(doc.file_path):
+        return FileResponse(
+            doc.file_path,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{doc.number}.pdf"'},
+        )
+
+    # Regenerate on-the-fly if file was wiped from ephemeral disk
+    biz = db.get(Business, doc.business_id)
+    cust = db.get(Customer, doc.customer_id) if doc.customer_id else None
+    tx = db.get(Transaction, doc.transaction_id) if doc.transaction_id else None
+    items = tx.items_json if tx and tx.items_json else [{"name": "Goods", "qty": 1, "unit": "unit", "line_total_kobo": doc.total_kobo}]
+    paid = tx.paid_kobo if tx else doc.total_kobo
+    bal = max(0, doc.total_kobo - paid)
+    pdf_bytes = documents.render_pdf_bytes(
+        business_name=biz.name if biz else "Business Padi Shop",
+        business_address=biz.address if biz else None,
+        business_phone=biz.phone if biz else None,
+        business_bank=biz.bank_details if biz else None,
+        business_footer=getattr(biz, "footer_note", None),
+        brand_color=getattr(biz, "brand_color", None),
+        logo_path=getattr(biz, "logo_path", None),
+        doc_kind="Receipt",
+        doc_number=doc.number,
+        doc_date=doc.created_at[:10] if doc.created_at else "Today",
+        customer_name=cust.name if cust else None,
+        customer_phone=cust.phone if cust else None,
+        items=items,
+        total_kobo=doc.total_kobo,
+        paid_kobo=paid,
+        balance_kobo=bal,
+    )
+    if doc.file_path:
+        os.makedirs(os.path.dirname(doc.file_path), exist_ok=True)
+        with open(doc.file_path, "wb") as f:
+            f.write(pdf_bytes)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{doc.number}.pdf"'},
+    )
+
+
 @router.get("/register", response_class=HTMLResponse)
 def register_page(request: Request, error: str | None = None):
     return templates.TemplateResponse(request, "register.html", {"error": error})

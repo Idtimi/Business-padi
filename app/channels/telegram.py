@@ -69,6 +69,21 @@ class TelegramChannel:
         caption: str = "",
     ) -> dict[str, Any]:
         """Send a document or download link to chat."""
+        import os
+        if os.path.exists(media_id):
+            url = f"{self._base_url}/sendDocument"
+            try:
+                with open(media_id, "rb") as f:
+                    content = f.read()
+                files = {"document": (filename, content, "application/pdf")}
+                data = {"chat_id": user_ref, "caption": caption or filename}
+                resp = await self._client.post(url, data=data, files=files)
+                if resp.status_code == 200:
+                    return resp.json()
+                log.warning("Telegram sendDocument file upload error [%s]: %s", resp.status_code, resp.text)
+            except Exception as e:
+                log.warning("Telegram sendDocument local file upload failed: %s", e)
+
         if media_id.startswith("http://") or media_id.startswith("https://"):
             url = f"{self._base_url}/sendDocument"
             payload = {

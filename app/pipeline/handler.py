@@ -120,7 +120,14 @@ def _non_text_replies(session: Session, biz: Business | None, user: User, msg: I
 async def _send_all(channel: Channel, session: Session, biz: Business | None, to_ref: str, replies: list[router.Reply]):
     for r in replies:
         resp = None
-        if r.buttons:
+        if getattr(r, "document_path", None) and hasattr(channel, "send_document"):
+            resp = await channel.send_document(
+                to_ref,
+                r.document_path,
+                getattr(r, "document_filename", "receipt.pdf"),
+                caption=r.text,
+            )
+        elif r.buttons:
             resp = await channel.send_buttons(to_ref, r.text, r.buttons)
         else:
             resp = await channel.send_text(to_ref, r.text)
@@ -133,7 +140,7 @@ async def _send_all(channel: Channel, session: Session, biz: Business | None, to
             business_id=biz.id if biz else None,
             to_ref=mask(to_ref),
             category="service",
-            msg_type="interactive" if r.buttons else "text",
+            msg_type="interactive" if r.buttons else ("document" if getattr(r, "document_path", None) else "text"),
             wa_message_id=wa_mid,
             status="sent",
             est_cost_kobo=message_cost_kobo("service")

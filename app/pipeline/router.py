@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.i18n import t
-from app.models import Business, Customer, PendingAction, ProcessedMessage, Transaction, User
+from app.models import Business, Customer, Document, PendingAction, ProcessedMessage, Transaction, User
 from app.money import fmt_naira
 from app.pipeline.extract import ExtractionFailed, extract
 from app.pipeline.llm import LLMClient, get_llm
@@ -20,6 +20,8 @@ class Reply:
     buttons: list[tuple[str, str]] = field(default_factory=list)  # (id, title)
     kind: str = "info"  # info | confirm | clarify
     pending_id: int | None = None
+    document_path: str | None = None
+    document_filename: str | None = None
 
 
 def parse_button(button_id: str) -> tuple[str, int]:
@@ -328,6 +330,57 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         demo_url = f"{settings.base_url.rstrip('/')}/d/login/demo"
         return [Reply(f"Here is your secure link to access the shop dashboard:\n{link_url}\n\nThis link expires in 15 minutes.\n\nOr click here for instant 1-click evaluation access:\n{demo_url}")]
 
+    # Check if user is replying with a phone number for pending receipt
+    user = session.get(User, user_id)
+    if user and user.state_data and user.state_data.get("pending_receipt_doc_id"):
+        st = dict(user.state_data)
+        pending_doc_id = st.get("pending_receipt_doc_id")
+        clean_digits = "".join(c for c in text if c.isdigit())
+        is_phone = len(clean_digits) in (10, 11, 13, 14) and not any(w in lower for w in ("sell", "sold", "buy", "bought", "fuel", "rent", "paid", "credit", "bag", "rice", "carton"))
+        if is_phone:
+            if clean_digits.startswith("0") and len(clean_digits) == 11:
+                clean_phone = "234" + clean_digits[1:]
+            elif clean_digits.startswith("234"):
+                clean_phone = clean_digits
+            else:
+                clean_phone = clean_digits
+
+            doc = session.get(Document, pending_doc_id)
+            cust_id = st.get("pending_receipt_cust_id")
+            cust = session.get(Customer, cust_id) if cust_id else None
+            if cust:
+                cust.phone = clean_phone
+                session.commit()
+
+            st.pop("pending_receipt_doc_id", None)
+            st.pop("pending_receipt_cust_id", None)
+            user.state_data = st
+            session.commit()
+
+            if doc:
+                download_url = f"{settings.base_url.rstrip('/')}/d/receipt/{doc.number}"
+                wa_msg = f"Hello {cust.name if cust else 'Customer'}, here is your receipt #{doc.number} from {biz.name if biz else 'Shop'} for {fmt_naira(doc.total_kobo)}: {download_url}"
+                wa_link = documents.wa_me_link(clean_phone, wa_msg)
+                session.add(ProcessedMessage(channel=channel, message_id=message_id))
+                session.commit()
+                return [Reply(
+                    f"Phone number saved (+{clean_phone})!\n\n"
+                    f"Tap the link below to send receipt #{doc.number} to {cust.name if cust else 'customer'} on WhatsApp:\n"
+                    f"{wa_link}\n\n"
+                    f"Direct PDF download:\n{download_url}"
+                )]
+        else:
+            st.pop("pending_receipt_doc_id", None)
+            st.pop("pending_receipt_cust_id", None)
+            user.state_data = st
+            session.commit()
+
+    # Direct receipt command
+    if lower in ("/receipt", "receipt", "/send_receipt", "send receipt") and biz:
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return handle_button(session, business_id, user_id, "get_receipt", lang=lang)
+
     # Financial trade profile command
     if lower in ("/profile", "profile", "/trade_profile", "trade profile") and biz:
         from app.services import profile
@@ -537,22 +590,88 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
             return [Reply(text, buttons=buttons)]
         return [Reply("Shop not found.")]
 
-    if action == "send_receipt":
-        tx = ledger.get_last_transaction(session, business_id)
+    if action == "send_receipt" or action.startswith("get_receipt"):
+        tx = None
+        if action.startswith("get_receipt:"):
+            try:
+                tx_id = int(action.split(":", 1)[1])
+                tx = session.get(Transaction, tx_id)
+            except ValueError:
+                pass
+        if tx is None:
+            tx = ledger.get_last_transaction(session, business_id)
         if tx is None:
             return [Reply("No recent sale found to create receipt.")]
-        doc = documents.issue_document(
-            session=session,
-            business_id=business_id,
-            kind="receipt",
-            transaction_id=tx.id,
-            customer_id=tx.customer_id,
-            items=tx.items_json or [],
-            total_kobo=tx.total_kobo,
-            paid_kobo=tx.paid_kobo,
+
+        doc = session.scalar(
+            select(Document).where(
+                Document.business_id == business_id,
+                Document.transaction_id == tx.id,
+                Document.status == "issued",
+            )
         )
-        link = documents.wa_me_link(None, f"Receipt #{doc.number}: {fmt_naira(doc.total_kobo)}")
-        return [Reply(f"Receipt #{doc.number} issued ({fmt_naira(doc.total_kobo)}).\nForward link: {link}")]
+        if doc is None:
+            doc = documents.issue_document(
+                session=session,
+                business_id=business_id,
+                kind="receipt",
+                transaction_id=tx.id,
+                customer_id=tx.customer_id,
+                items=tx.items_json or [],
+                total_kobo=tx.total_kobo,
+                paid_kobo=tx.paid_kobo,
+            )
+
+        download_url = f"{settings.base_url.rstrip('/')}/d/receipt/{doc.number}"
+        cust = session.get(Customer, tx.customer_id) if tx.customer_id else None
+        cust_name = cust.name if cust else "customer"
+        biz = session.get(Business, business_id)
+
+        user = session.get(User, user_id)
+        if user:
+            st = dict(user.state_data or {})
+            st["pending_receipt_doc_id"] = doc.id
+            st["pending_receipt_cust_id"] = tx.customer_id
+            user.state_data = st
+            session.commit()
+
+        replies = [
+            Reply(
+                text=f"Receipt #{doc.number} issued ({fmt_naira(doc.total_kobo)})\nDownload PDF: {download_url}",
+                document_path=doc.file_path,
+                document_filename=f"{doc.number}.pdf",
+            )
+        ]
+
+        if cust and cust.phone:
+            wa_msg = f"Hello {cust.name}, here is your receipt #{doc.number} from {biz.name if biz else 'Shop'} for {fmt_naira(doc.total_kobo)}: {download_url}"
+            wa_link = documents.wa_me_link(cust.phone, wa_msg)
+            replies.append(Reply(
+                text=(
+                    f"Forward receipt to {cust.name} on WhatsApp:\n{wa_link}\n\n"
+                    f"To send to a different number, reply with customer's phone number, or tap [Done]."
+                ),
+                buttons=[(f"skip_receipt:{doc.id}", "Done")],
+            ))
+        else:
+            replies.append(Reply(
+                text=(
+                    f"Send receipt to {cust_name} on WhatsApp?\n"
+                    f"Reply with customer's phone number (e.g. 08012345678) or tap [Skip]."
+                ),
+                buttons=[(f"skip_receipt:{doc.id}", "Skip")],
+            ))
+        return replies
+
+    if action.startswith("skip_receipt"):
+        user = session.get(User, user_id)
+        if user:
+            st = dict(user.state_data or {})
+            st.pop("pending_receipt_doc_id", None)
+            st.pop("pending_receipt_cust_id", None)
+            user.state_data = st
+            session.commit()
+        return [Reply("Receipt ready. You can record another sale or type /dashboard.")]
 
     try:
         p = pending.get_for_business(session, business_id, pending_id)
@@ -584,7 +703,11 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
                 tx = ledger.confirm_correction(session, business_id, pending_id)
                 return [Reply(_saved_text(session, business_id, tx, lang))]
             tx = ledger.confirm(session, business_id, pending_id)
-            return [Reply(_saved_text(session, business_id, tx, lang))]
+            saved_msg = _saved_text(session, business_id, tx, lang)
+            buttons = []
+            if tx.kind == "sale":
+                buttons.append((f"get_receipt:{tx.id}", "Download Receipt"))
+            return [Reply(saved_msg, buttons=buttons)]
         if action == "cancel":
             pending.cancel(session, business_id, pending_id)
             return [Reply(t(lang, "cancelled"))]
