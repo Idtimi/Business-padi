@@ -42,6 +42,15 @@ class OpenAILLM:
         try:
             with httpx.Client(timeout=30.0) as client:
                 res = client.post(self.endpoint, headers=headers, json=payload)
+                if res.status_code == 404 and "groq" in self.endpoint:
+                    for alt in ("qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"):
+                        if alt != self.model:
+                            payload["model"] = alt
+                            alt_res = client.post(self.endpoint, headers=headers, json=payload)
+                            if alt_res.status_code == 200:
+                                res = alt_res
+                                log.info("Recovered from model 404 using %s", alt)
+                                break
                 res.raise_for_status()
                 data = res.json()
                 content = data["choices"][0]["message"]["content"]
