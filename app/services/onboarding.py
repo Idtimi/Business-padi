@@ -162,14 +162,13 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
     if user.state == "NEW":
         user.state = "CHOOSE_LANGUAGE"
         session.commit()
-        welcome = (
-            "Welcome to Business Padi. Abeg choose your language:"
-            if is_pidgin else
-            "Welcome to Business Padi. Choose your language:"
-        )
+        welcome = "Welcome to Business Padi. Choose your language:"
         buttons = [
-            ("lang:pcm", "Nigerian Pidgin"),
             ("lang:en", "English"),
+            ("lang:pcm", "Nigerian Pidgin"),
+            ("lang:yo", "Yorùbá"),
+            ("lang:ha", "Hausa"),
+            ("lang:ig", "Ìgbò"),
             ("lang:other", "Other language"),
         ]
         return [Reply(welcome, buttons=buttons, kind="confirm")]
@@ -177,7 +176,7 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
     # State: CHOOSE_LANGUAGE
     if user.state == "CHOOSE_LANGUAGE":
         t_clean = text.lower().strip()
-        if btn == "lang:other" or t_clean in ("3", "other", "other language"):
+        if btn == "lang:other" or t_clean in ("6", "other", "other language"):
             from app.models import Event
             session.add(Event(
                 user_id=user.id,
@@ -185,22 +184,27 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
                 props={"source": "onboarding_other_button", "text": text},
             ))
             session.commit()
-            prompt = (
-                "Thank you! We don note say you want another language. While we dey work on am, which one you wan use now?"
-                if is_pidgin else
-                "Thank you! We have recorded your interest in additional languages. In the meantime, which would you prefer?"
-            )
+            prompt = "Thank you! We have recorded your interest in another language. In the meantime, please select one of the supported languages to continue:"
             buttons = [
-                ("lang:pcm", "Nigerian Pidgin"),
                 ("lang:en", "English"),
+                ("lang:pcm", "Nigerian Pidgin"),
+                ("lang:yo", "Yorùbá"),
+                ("lang:ha", "Hausa"),
+                ("lang:ig", "Ìgbò"),
             ]
             return [Reply(prompt, buttons=buttons, kind="confirm")]
 
-        chosen_lang = "pcm"
-        if btn == "lang:en" or t_clean in ("2", "english", "en"):
+        chosen_lang = "en"
+        if btn == "lang:en" or t_clean in ("1", "english", "en"):
             chosen_lang = "en"
-        elif btn == "lang:pcm" or t_clean in ("1", "pidgin", "pcm", "nigerian pidgin"):
+        elif btn == "lang:pcm" or t_clean in ("2", "pidgin", "pcm", "nigerian pidgin"):
             chosen_lang = "pcm"
+        elif btn == "lang:yo" or t_clean in ("3", "yoruba", "yo", "yorùbá"):
+            chosen_lang = "yo"
+        elif btn == "lang:ha" or t_clean in ("4", "hausa", "ha"):
+            chosen_lang = "ha"
+        elif btn == "lang:ig" or t_clean in ("5", "igbo", "ig", "ìgbò"):
+            chosen_lang = "ig"
         elif btn.startswith("lang:"):
             chosen_lang = btn.replace("lang:", "")
             from config.languages import resolve_ui_language
@@ -221,6 +225,27 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
                 "You fit export or delete your data anytime. You agree?"
             )
             buttons = [("consent:yes", "I agree"), ("consent:no", "No")]
+        elif chosen_lang == "yo":
+            prompt = (
+                "Mo ma se akosile tita ati gbese ti e ba so, lati toju iwe isiro yin. "
+                "A n pa ohun re lehin ti a ba ti gbo tan. "
+                "E le mu jade tabi pa data yin re nigbakugba. Se e gba?"
+            )
+            buttons = [("consent:yes", "Mo gba"), ("consent:no", "Rara")]
+        elif chosen_lang == "ha":
+            prompt = (
+                "Zan rubuta sayarwa da bashin da kake fada don kiyaye littafin kasuwancin ku. "
+                "Ana share sautin bayan an gama ganewa. "
+                "Kuna iya fitarwa ko share bayanan ku a kowane lokaci. Ka amince?"
+            )
+            buttons = [("consent:yes", "Na amince"), ("consent:no", "A'a")]
+        elif chosen_lang == "ig":
+            prompt = (
+                "M ga-edekota ahia na ugwo ndi i kwuru iji debe akwukwo ego gi. "
+                "A na-ehichapu olu gi ma aghotachaa ya. "
+                "I nwere ike ibupura ma obu hichapu data gi oge obula. I kwenyere?"
+            )
+            buttons = [("consent:yes", "Ekwenyere m"), ("consent:no", "Mba")]
         else:
             prompt = (
                 "I will record the sales and debts you tell me, to keep your books. "
@@ -234,12 +259,24 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
     # State: CONSENT
     if user.state == "CONSENT":
         t_clean = text.lower().strip()
-        agreed = (btn == "consent:yes") or t_clean in {"1", "yes", "i agree", "agree", "ok", "yes i agree"}
+        agreed = (btn == "consent:yes") or t_clean in {
+            "1", "yes", "i agree", "agree", "ok", "yes i agree",
+            "mo gba", "na amince", "ekwenyere m", "ekwenyere", "gba"
+        }
         if agreed:
             user.consent_at = now_iso()
             user.state = "BUSINESS_NAME"
             session.commit()
-            prompt = "Wetin be your shop name?" if is_pidgin else "What is your shop name?"
+            if user.language == "yo":
+                prompt = "Kini oruko soobu yin?"
+            elif user.language == "ha":
+                prompt = "Mene ne sunan shagon ku?"
+            elif user.language == "ig":
+                prompt = "Kedu aha ulo ahia gi?"
+            elif user.language == "pcm":
+                prompt = "Wetin be your shop name?"
+            else:
+                prompt = "What is your shop name?"
             return [Reply(prompt)]
         else:
             prompt = (

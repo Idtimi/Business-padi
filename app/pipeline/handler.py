@@ -194,6 +194,16 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         await _send_all(channel, session, biz, msg.user_ref, replies)
         return
 
+    # Check for setup / reset / restart commands
+    if msg.kind == "text" and t_upper in ("/SETUP", "SETUP", "/ONBOARD", "ONBOARDING", "/RESET_SHOP", "/RESET", "RESTART", "/RESTART"):
+        user.state = "NEW"
+        session.commit()
+        replies = await onboarding.handle_onboarding(channel, msg, user, session)
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        await _send_all(channel, session, biz, msg.user_ref, replies)
+        return
+
     # 1. Check for settings commands upfront
     if msg.kind == "text" and text.lower().startswith("/settings"):
         if user.state != "DONE":
