@@ -113,22 +113,27 @@ async def receive_twilio_webhook(
     channel = TwilioReplyCollector()
     with SessionLocal() as session:
         try:
-            # Ensure starter business exists for this user so they can immediately test
+            # Look up or create user
             user = session.query(User).filter(User.channel_user_id == clean_sender).first()
             if user is None:
+                # Brand new user begins with company onboarding & language choice
                 user = User(
                     channel="whatsapp",
                     channel_user_id=clean_sender,
                     display_name=f"Shop Owner {clean_sender[-4:]}",
                     language=settings.default_language,
-                    state="DONE",
-                    consent_at=now_iso(),
+                    state="NEW",
                 )
                 session.add(user)
-                session.flush()
+                session.commit()
+
+            # Allow user to restart/run onboarding anytime
+            if msg.kind == "text" and msg.text and msg.text.strip().lower() in ("/setup", "setup", "/onboard", "onboarding", "/reset_shop", "start setup"):
+                user.state = "NEW"
+                session.commit()
 
             biz = session.query(Business).filter(Business.owner_user_id == user.id).first()
-            if biz is None:
+            if user.state == "DONE" and biz is None:
                 biz = Business(
                     owner_user_id=user.id,
                     name=f"Shop {clean_sender[-4:]}",
@@ -143,7 +148,7 @@ async def receive_twilio_webhook(
                 session.commit()
 
             # Handle numbered option replies for pending actions
-            if msg.kind == "text" and msg.text:
+            if user.state == "DONE" and biz is not None and msg.kind == "text" and msg.text:
                 from app.models import PendingAction
                 t_lower = msg.text.strip().lower()
                 open_pending = session.query(PendingAction).filter(

@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import text
 
 from app.config import settings
@@ -39,6 +39,22 @@ app.include_router(whatsapp_router)
 app.include_router(twilio_router)
 app.include_router(dashboard_router, prefix="/d")
 app.include_router(profile_router)
+
+
+FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 95" fill="none">
+    <path d="M22 10C56 10 78 22 78 45C78 65 58 74 36 74L36 84C36 89.5 31.5 94 26 94C20.5 94 16 89.5 16 84L16 24C16 16.3 22 10 26 10H22Z" fill="#FF6A13"/>
+    <rect x="34" y="28" width="26" height="32" rx="13" fill="#0D1F45"/>
+    <rect x="39" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+    <rect x="45.4" y="33" width="3.2" height="22" rx="1.6" fill="#FF6A13"/>
+    <rect x="51.8" y="38" width="3.2" height="12" rx="1.6" fill="#FF6A13"/>
+    <circle cx="82" cy="18" r="8" fill="#FFC233"/>
+</svg>"""
+
+
+@app.get("/favicon.ico")
+@app.get("/favicon.svg")
+def favicon():
+    return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
 
 @app.get("/")

@@ -39,21 +39,28 @@ def _get_secret() -> str:
 
 def generate_magic_link(session: Session, user_id: int, business_id: int,
                         base_url: str | None = None) -> tuple[str, str]:
-    """Generates a secure one-time login token, saves its hash with 15m expiry, and returns (token, url)."""
-    raw_token = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=DEFAULT_EXPIRY_MINUTES)).isoformat()
+    """Generates a secure, stateless signed login token with 15m expiry, resilient to restarts."""
+    exp_ts = int(time.time()) + (DEFAULT_EXPIRY_MINUTES * 60)
+    data = f"{user_id}:{business_id}:{exp_ts}"
+    secret = _get_secret()
+    sig = hmac.new(secret.encode(), data.encode(), hashlib.sha256).hexdigest()
+    raw_token = f"{user_id}_{business_id}_{exp_ts}_{sig[:24]}"
 
-    action = PendingAction(
-        business_id=business_id,
-        user_id=user_id,
-        kind="dashboard_login",
-        payload={"token_hash": token_hash},
-        status="open",
-        expires_at=expires_at,
-    )
-    session.add(action)
-    session.commit()
+    # Save to PendingAction for audit / DB tracking
+    try:
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=DEFAULT_EXPIRY_MINUTES)).isoformat()
+        action = PendingAction(
+            business_id=business_id,
+            user_id=user_id,
+            kind="dashboard_login",
+            payload={"token_hash": hashlib.sha256(raw_token.encode()).hexdigest()},
+            status="open",
+            expires_at=expires_at,
+        )
+        session.add(action)
+        session.commit()
+    except Exception:
+        log.exception("Could not save pending dashboard login action to DB (stateless fallback will verify)")
 
     root_url = (base_url or settings.base_url).rstrip("/")
     login_url = f"{root_url}/d/login?token={raw_token}"
@@ -61,19 +68,20 @@ def generate_magic_link(session: Session, user_id: int, business_id: int,
 
 
 def verify_magic_token(session: Session, raw_token: str) -> tuple[bool, str, PendingAction | None]:
-    """Validates the raw magic token against open PendingAction entries.
+    """Validates magic token against DB entries, with stateless cryptographic fallback on DB wipe.
 
     Returns (is_valid, message, action).
     """
     if not raw_token or not raw_token.strip():
         return False, "Missing or invalid login token.", None
 
-    token_hash = hashlib.sha256(raw_token.strip().encode()).hexdigest()
+    clean_t = raw_token.strip()
+    token_hash = hashlib.sha256(clean_t.encode()).hexdigest()
 
+    # 1. First check DB record if present
     candidates = session.scalars(
         select(PendingAction).where(
             PendingAction.kind == "dashboard_login",
-            PendingAction.status == "open",
         )
     ).all()
 
@@ -83,8 +91,55 @@ def verify_magic_token(session: Session, raw_token: str) -> tuple[bool, str, Pen
             matched_action = cand
             break
 
-    if matched_action is None:
-        return False, "Invalid or already used login token.", None
+    if matched_action is not None:
+        if matched_action.status == "applied":
+            return False, "Invalid or already used login token.", None
+
+        # Check expiry
+        if matched_action.expires_at:
+            try:
+                exp_dt = datetime.fromisoformat(matched_action.expires_at)
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+                if now > exp_dt:
+                    matched_action.status = "expired"
+                    session.commit()
+                    return False, "This login link has expired. Please request a new one via WhatsApp.", None
+            except Exception:
+                log.exception("Error checking token expiration")
+
+        # Mark as applied
+        matched_action.status = "applied"
+        session.commit()
+        return True, "OK", matched_action
+
+    # 2. Stateless cryptographic verification fallback (if DB was reset/wiped by deploy)
+    if "_" in clean_t:
+        parts = clean_t.split("_")
+        if len(parts) == 4:
+            try:
+                u_id_s, b_id_s, exp_s, sig = parts
+                user_id = int(u_id_s)
+                biz_id = int(b_id_s)
+                exp_ts = int(exp_s)
+                secret = _get_secret()
+                data = f"{user_id}:{biz_id}:{exp_ts}"
+                expected_sig = hmac.new(secret.encode(), data.encode(), hashlib.sha256).hexdigest()
+                if hmac.compare_digest(sig, expected_sig[:24]):
+                    if time.time() > exp_ts:
+                        return False, "This login link has expired. Please request a new one via WhatsApp.", None
+                    action = PendingAction(
+                        business_id=biz_id,
+                        user_id=user_id,
+                        kind="dashboard_login",
+                        status="applied",
+                    )
+                    return True, "OK", action
+            except Exception:
+                log.exception("Error decoding stateless magic token")
+
+    return False, "Invalid or already used login token.", None
 
     # Check expiry
     if matched_action.expires_at:

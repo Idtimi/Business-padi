@@ -149,7 +149,8 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
 
     # State: CHOOSE_LANGUAGE
     if user.state == "CHOOSE_LANGUAGE":
-        if btn == "lang:other" or "other" in text.lower():
+        t_clean = text.lower().strip()
+        if btn == "lang:other" or t_clean in ("3", "other", "other language"):
             from app.models import Event
             session.add(Event(
                 user_id=user.id,
@@ -169,9 +170,9 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
             return [Reply(prompt, buttons=buttons, kind="confirm")]
 
         chosen_lang = "pcm"
-        if btn == "lang:en" or "english" in text.lower() or text.lower() == "en":
+        if btn == "lang:en" or t_clean in ("2", "english", "en"):
             chosen_lang = "en"
-        elif btn == "lang:pcm" or "pidgin" in text.lower() or text.lower() == "pcm":
+        elif btn == "lang:pcm" or t_clean in ("1", "pidgin", "pcm", "nigerian pidgin"):
             chosen_lang = "pcm"
         elif btn.startswith("lang:"):
             chosen_lang = btn.replace("lang:", "")
@@ -205,7 +206,8 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
 
     # State: CONSENT
     if user.state == "CONSENT":
-        agreed = (btn == "consent:yes") or text.lower() in {"yes", "i agree", "agree", "ok", "yes i agree"}
+        t_clean = text.lower().strip()
+        agreed = (btn == "consent:yes") or t_clean in {"1", "yes", "i agree", "agree", "ok", "yes i agree"}
         if agreed:
             user.consent_at = now_iso()
             user.state = "BUSINESS_NAME"
@@ -244,7 +246,7 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
     # State: LOGO
     if user.state == "LOGO":
         biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
-        skipped = (btn == "logo:skip") or text.lower() in {"skip", "no", "later"}
+        skipped = (btn == "logo:skip") or text.lower().strip() in {"1", "skip", "no", "later"}
 
         if msg.kind == "image" and msg.media_ref:
             try:
@@ -263,17 +265,25 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
             if not is_pidgin else
             "Pick a color for your receipts:"
         )
-        buttons = [("color:green", "Green"), ("color:blue", "Blue"), ("color:purple", "Purple")]
+        buttons = [("color:orange", "Orange"), ("color:green", "Green"), ("color:blue", "Blue")]
         return [Reply(prompt, buttons=buttons, kind="confirm")]
 
     # State: BRAND_COLOR
     if user.state == "BRAND_COLOR":
         biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
-        color = "green"
+        color = "#FF6A13"
+        t_clean = text.lower().strip()
         if btn.startswith("color:"):
-            color = btn.split(":", 1)[1]
+            cname = btn.split(":", 1)[1]
+            color = "#0B8457" if cname == "green" else ("#0D1F45" if cname == "blue" else "#FF6A13")
+        elif t_clean in ("1", "orange"):
+            color = "#FF6A13"
+        elif t_clean in ("2", "green"):
+            color = "#0B8457"
+        elif t_clean in ("3", "blue"):
+            color = "#0D1F45"
         elif text:
-            color = text.lower()
+            color = text.strip()
 
         if biz:
             biz.brand_color = color
@@ -292,7 +302,7 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
     # State: CONTACT
     if user.state == "CONTACT":
         biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
-        skipped = (btn == "contact:skip") or text.lower() in {"skip", "no", "later"}
+        skipped = (btn == "contact:skip") or text.lower().strip() in {"1", "skip", "no", "later"}
 
         if not skipped and text and biz:
             biz.address = text
