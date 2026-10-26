@@ -1,15 +1,54 @@
 import json
+import logging
+import os
 from pathlib import Path
 import re
 from typing import Protocol
 
 from app.config import settings
 
+log = logging.getLogger(__name__)
+
 FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "extraction_cases.jsonl"
 
 
 class LLMClient(Protocol):
     def complete_json(self, system: str, user: str, schema_name: str) -> dict: ...
+
+
+class OpenAILLM:
+    """Real LLM client for Groq / OpenAI with JSON mode."""
+
+    def __init__(self, api_key: str, endpoint: str = "https://api.groq.com/openai/v1/chat/completions", model: str = "llama-3.3-70b-versatile"):
+        self.api_key = api_key
+        self.endpoint = endpoint
+        self.model = model
+
+    def complete_json(self, system: str, user: str, schema_name: str) -> dict:
+        import httpx
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
+        }
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                res = client.post(self.endpoint, headers=headers, json=payload)
+                res.raise_for_status()
+                data = res.json()
+                content = data["choices"][0]["message"]["content"]
+                return json.loads(content)
+        except Exception as e:
+            log.warning("LLM API call failed, falling back to rule parser: %s", e)
+            return MockLLM().complete_json(system, user, schema_name)
 
 
 class MockLLM:
@@ -65,6 +104,7 @@ class MockLLM:
             'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5',
             'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10',
             'twenty': '20', 'thirty': '30', 'forty': '40', 'fifty': '50',
+            'sixty': '60', 'seventy': '70', 'eighty': '80', 'ninety': '90',
             'hundred': '100', 'thousand': '000',
             'ookan': '1', 'meji': '2', 'meta': '3', 'merin': '4', 'marun': '5',
             'daya': '1', 'biyu': '2', 'uku': '3', 'hudu': '4', 'biyar': '5',
@@ -73,13 +113,14 @@ class MockLLM:
         for w, d in word_map.items():
             user_norm = re.sub(rf'\b{w}\b', d, user_norm)
 
-        # Normalize currency phrases like '40 k' -> '40k', '40 000' -> '40000'
-        user_norm = re.sub(r'(\d+)\s+k\b', r'\1k', user_norm)
-        user_norm = re.sub(r'(\d+)\s+000\b', r'\1000', user_norm)
+        # Normalize currency phrases safely without octal escape collisions
+        user_norm = re.sub(r'(\d+)\s+k\b', r'\g<1>k', user_norm)
+        user_norm = re.sub(r'(\d+)\s+000\b', r'\g<1>000', user_norm)
+        user_norm = re.sub(r'(\d+)\s+(\d{3})\b', r'\g<1>\g<2>', user_norm)
 
         # Detect language
         lang_detected = "english"
-        if any(w in user_norm for w in ('dey', 'don', 'fit', 'wetin', 'abeg', 'una', 'am')):
+        if any(w in user_norm for w in ('dey', 'don', 'fit', 'wetin', 'abeg', 'una', 'am', 'na ')):
             lang_detected = "pcm"
         elif any(w in user_norm for w in ('mo ta', 'tita', 'san owo', 'e jowo', 'inawo', 'gbese', 'fun ')):
             lang_detected = "yo"
@@ -135,60 +176,54 @@ class MockLLM:
                 }],
             }
 
-        # Sales (sell / sold / sale / buy / bought / ta / sayar / erere)
-        is_sale = any(w in user_norm for w in ("sell", "sold", "sale", "buy", "bought", "ta ", "mo ta", "tita", "sayar", "erere", "ree", "give", "dash", "collect"))
-        all_num_matches = list(re.finditer(r'\b(\d[\d,]*k?)\b', user_norm))
+        # Sales (sell / sold / sale / buy / bought / ta / sayar / erere / bags / to ...)
+        is_sale = any(w in user_norm for w in ("sell", "sold", "sale", "buy", "bought", "ta ", "mo ta", "tita", "sayar", "erere", "ree", "give", "dash", "collect", "together", "na "))
+        all_num_matches = [int(n.replace(',', '')) for n in re.findall(r'\b\d+\b', user_norm)]
 
         if is_sale or len(all_num_matches) > 0:
             # Look for quantity explicitly tied to a unit
             m_qty = re.search(r'\b(\d+)\s*(bag|carton|sachet|piece|unit|kg|crate|pack|bundle|paint|mudu|derica|cup)s?\b', user_norm)
             qty = 1
             unit = "unit"
-            qty_str = None
+            qty_val = None
             if m_qty:
                 qty = int(m_qty.group(1))
                 unit = m_qty.group(2)
-                qty_str = m_qty.group(1)
+                qty_val = qty
 
             # Look for trade commodity
             m_item = re.search(r'\b(rice|beans|indomie|garri|oil|sugar|fuel|cement|milo|yam|provisions|bread|eggs|meat|fish|soap|drinks|flour|biscuit|spaghetti|semovita|milk|groundnut)\b', user_norm)
             item = m_item.group(1) if m_item else "goods"
 
-            # Check for debt / owe amount
-            m_owe = re.search(r'(?:owe|balance|remain|gbese|bashi|ugwo)\s*(\d[\d,]*k?)', user_norm)
+            # Parse numbers (exclude small quantity if unit was matched)
+            nums = [n for n in all_num_matches if n != qty_val or n >= 100]
+
+            # Look for paid amount explicitly
+            m_paid = re.search(r'(?:pay|paid|san|biya|kwuru|bin pay)\s*(\d[\d,]*k?)', user_norm)
+            paid_val = 0
+            if m_paid:
+                raw_p = m_paid.group(1).replace(",", "")
+                paid_val = int(float(raw_p[:-1]) * 1000) if raw_p.endswith("k") else (int(raw_p) if raw_p.isdigit() else 0)
+
+            # Look for debt / owe amount
+            m_owe = re.search(r'(?:owe|balance|remain|own|dey may|gbese|bashi|ugwo)\s*(\d[\d,]*k?)', user_norm)
             owe_val = 0
             if m_owe:
-                raw_owe = m_owe.group(1).replace(",", "")
-                owe_val = int(float(raw_owe[:-1]) * 1000) if raw_owe.endswith("k") else (int(raw_owe) if raw_owe.isdigit() else 0)
+                raw_o = m_owe.group(1).replace(",", "")
+                owe_val = int(float(raw_o[:-1]) * 1000) if raw_o.endswith("k") else (int(raw_o) if raw_o.isdigit() else 0)
 
-            # Parse all numerical amounts
-            nums = []
-            for nm in all_num_matches:
-                raw = nm.group(1).replace(",", "")
-                val = int(float(raw[:-1]) * 1000) if raw.endswith("k") else (int(raw) if raw.isdigit() else 0)
-                if qty_str and raw == qty_str and val < 100:
-                    continue
-                nums.append(val)
-
-            total_amt = 0
-            if nums:
-                total_amt = max(nums)
-                if owe_val == total_amt and len(nums) > 1:
-                    candidates = [n for n in nums if n != owe_val]
-                    if candidates:
-                        total_amt = candidates[0]
+            total_amt = max(nums) if nums else 0
 
             # Determine payment & amount_paid
-            if any(w in user_norm for w in ("credit", "never pay", "no pay", "not pay")):
+            if paid_val > 0 and paid_val < total_amt:
+                payment = "partial"
+                amount_paid = paid_val
+            elif owe_val > 0 and owe_val < total_amt:
+                payment = "partial"
+                amount_paid = total_amt - owe_val
+            elif any(w in user_norm for w in ("credit", "never pay", "no pay", "not pay")) or (owe_val >= total_amt and total_amt > 0):
                 payment = "credit"
                 amount_paid = 0
-            elif owe_val > 0:
-                if owe_val >= total_amt:
-                    payment = "credit"
-                    amount_paid = 0
-                else:
-                    payment = "partial"
-                    amount_paid = total_amt - owe_val
             else:
                 payment = "cash"
                 amount_paid = total_amt
@@ -196,7 +231,7 @@ class MockLLM:
             # Extract customer name
             m_cust = re.search(r'(?:to|give|fun|ga|nye)\s+([a-zA-Z]+)', user_norm)
             if not m_cust:
-                m_cust = re.search(r'([a-zA-Z]+)\s+(?:buy|collect|bought)', user_norm)
+                m_cust = re.search(r'([a-zA-Z]+)\s+(?:buy|collect|bought|bin pay|paid)', user_norm)
             cust = m_cust.group(1).title() if m_cust else "Customer"
 
             unit_price = int(total_amt / qty) if qty > 0 and total_amt > 0 else total_amt
@@ -227,6 +262,15 @@ class MockLLM:
 
 
 def get_llm() -> LLMClient:
-    if settings.llm_provider == "mock" or settings.demo_mode:
-        return MockLLM()
-    raise NotImplementedError("Real LLM provider comes later")
+    api_key = getattr(settings, "llm_api_key", "") or os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if api_key:
+        provider = getattr(settings, "llm_provider", "groq").lower()
+        if "openai" in provider or api_key.startswith("sk-proj-") or (api_key.startswith("sk-") and not api_key.startswith("gsk_")):
+            endpoint = "https://api.openai.com/v1/chat/completions"
+            model = settings.llm_model or "gpt-4o-mini"
+        else:
+            endpoint = "https://api.groq.com/openai/v1/chat/completions"
+            model = settings.llm_model or "llama-3.3-70b-versatile"
+        return OpenAILLM(api_key=api_key, endpoint=endpoint, model=model)
+
+    return MockLLM()
