@@ -300,7 +300,7 @@ def get_llm() -> LLMClient:
             model = settings.llm_model or "gpt-4o-mini"
         else:
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
-            model = settings.llm_model or "llama-3.3-70b-versatile"
+            model = settings.llm_model or "qwen/qwen3.8-27b"
         return OpenAILLM(api_key=api_key, endpoint=endpoint, model=model)
 
     return MockLLM()

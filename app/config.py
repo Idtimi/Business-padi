@@ -20,12 +20,12 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_whatsapp_number: str = "whatsapp:+14155238886"
 
-    asr_provider: str = "yarngpt"
-    asr_model: str = ""
-    asr_api_key: str = ""
-    llm_provider: str = "mock"
-    llm_model: str = ""
-    llm_api_key: str = ""
+    asr_provider: str = os.environ.get("ASR_PROVIDER", "groq")
+    asr_model: str = os.environ.get("ASR_MODEL", "whisper-large-v3")
+    asr_api_key: str = os.environ.get("ASR_API_KEY", "")
+    llm_provider: str = os.environ.get("LLM_PROVIDER", "groq")
+    llm_model: str = os.environ.get("LLM_MODEL", "qwen/qwen3.8-27b")
+    llm_api_key: str = os.environ.get("LLM_API_KEY", "")
     tts_provider: str = "yarngpt"
     yarngpt_api_key: str = "sk_live_10ypR9T5hMJkcyCK.auXXCXsSJjMSN7RUjsqjTSHULCFs56OtrEZVgegBOwQ"
     telegram_bot_token: str = "8385879089:AAGbfSdub46z9c7JwfeMtLhUC6I7zEzJ-Ik"

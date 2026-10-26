@@ -195,7 +195,7 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         return
 
     # Check for setup / reset / restart commands
-    if msg.kind == "text" and t_upper in ("/SETUP", "SETUP", "/ONBOARD", "ONBOARDING", "/RESET_SHOP", "/RESET", "RESTART", "/RESTART"):
+    if msg.kind == "text" and t_upper in ("/START", "START", "/SETUP", "SETUP", "/ONBOARD", "ONBOARDING", "/RESET_SHOP", "/RESET", "RESTART", "/RESTART"):
         user.state = "NEW"
         session.commit()
         replies = await onboarding.handle_onboarding(channel, msg, user, session)

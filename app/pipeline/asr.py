@@ -66,6 +66,11 @@ class YarnGPTASR:
         except Exception as e:
             log.exception("YarnGPT ASR exception on %s: %s", wav_path, e)
 
+        from app.config import settings
+        groq_or_whisper_key = getattr(settings, "asr_api_key", "") or getattr(settings, "llm_api_key", "")
+        if groq_or_whisper_key:
+            return WhisperASR(api_key=groq_or_whisper_key).transcribe(wav_path, language_hint, glossary)
+
         return MockASR().transcribe(wav_path, language_hint, glossary)
 
 

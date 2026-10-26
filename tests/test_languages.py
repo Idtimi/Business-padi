@@ -268,10 +268,10 @@ def test_end_to_end_multilingual_and_code_switching():
         db.add(b_yo)
         db.commit()
 
-        # Code-switched Yoruba + English: "Mo ta 2 bags of rice fun Emeka 80k"
+        # Code-switched Yoruba + English: "Mo ta 2 bags of rice fun Emeka 80k cash"
         rep_yo = handle_text(
             db, b_yo.id, u_yo.id,
-            "Mo ta 2 bags of rice fun Emeka 80k",
+            "Mo ta 2 bags of rice fun Emeka 80k cash",
             f"msg_{uuid.uuid4().hex[:6]}",
             lang="yo",
         )
@@ -309,10 +309,10 @@ def test_end_to_end_multilingual_and_code_switching():
         db.add(b_ha)
         db.commit()
 
-        # Code-switched Hausa + English: "Sayar 2 bags of rice to Musa 40k"
+        # Code-switched Hausa + English: "Sayar 2 bags of rice to Musa 40k cash"
         rep_ha = handle_text(
             db, b_ha.id, u_ha.id,
-            "Sayar 2 bags of rice to Musa 40k",
+            "Sayar 2 bags of rice to Musa 40k cash",
             f"msg_{uuid.uuid4().hex[:6]}",
             lang="ha",
         )
@@ -346,10 +346,10 @@ def test_end_to_end_multilingual_and_code_switching():
         db.add(b_ig)
         db.commit()
 
-        # Code-switched Igbo + English: "Sell 2 bags rice to Chidi 30k"
+        # Code-switched Igbo + English: "Sell 2 bags rice to Chidi 30k cash"
         rep_ig = handle_text(
             db, b_ig.id, u_ig.id,
-            "Sell 2 bags rice to Chidi 30k",
+            "Sell 2 bags rice to Chidi 30k cash",
             f"msg_{uuid.uuid4().hex[:6]}",
             lang="ig",
         )

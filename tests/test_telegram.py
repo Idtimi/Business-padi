@@ -34,12 +34,13 @@ def test_telegram_webhook_start_command(monkeypatch):
     uid = uuid.uuid4().hex[:8]
     client = TestClient(app)
     # Simulate user sending /start
+    test_user_id = int(uuid.uuid4().int % 100000000 + 100000)
     payload = {
         "update_id": int(uuid.uuid4().int % 10000000),
         "message": {
             "message_id": f"m_{uid}",
-            "from": {"id": 12345678, "first_name": "Timi"},
-            "chat": {"id": 12345678, "type": "private"},
+            "from": {"id": test_user_id, "first_name": "Timi"},
+            "chat": {"id": test_user_id, "type": "private"},
             "date": 1730000000,
             "text": "/start",
         },
