@@ -593,50 +593,71 @@ async def dispatch_evening_summaries(session: Session, channel, as_of: datetime 
 # ---------- Fallback formatting (pure template, no hallucination) ----------
 
 def fallback_wording(facts: dict, lang: str = "en") -> str:
-    """Deterministic plain text formatting of query facts."""
+    """Deterministic plain text formatting of query facts in trader's chosen language."""
     qtype = facts.get("type")
-    is_pidgin = (lang == "pcm")
 
     if qtype == "total_owed":
         amount = facts.get("total_naira", "N0")
         count = facts.get("debtor_count", 0)
         if count == 0 or facts.get("total_kobo", 0) == 0:
-            return "Nobody dey owe you right now." if is_pidgin else "Nobody owes you right now."
-        if is_pidgin:
-            return f"Total money wey people owe you na {amount} ({count} customer)."
+            if lang == "yo": return "Ko si eni to je yin ni gbese lowolowo."
+            if lang == "ha": return "Babu wanda yake bin ku bashi a yanzu."
+            if lang == "ig": return "O nweghi onye ji gi ugwo ugbu a."
+            if lang == "pcm": return "Nobody dey owe you right now."
+            return "Nobody owes you right now."
+        if lang == "yo": return f"Apapo owo gbese ti awon onibara je yin je {amount} ({count} onibara)."
+        if lang == "ha": return f"Jimillar bashin da ake bin abokan ciniki: {amount} ({count} abokin ciniki)."
+        if lang == "ig": return f"Ngukota ugwo ndi ahia ji gi bu {amount} ({count} onye ahia)."
+        if lang == "pcm": return f"Total money wey people owe you na {amount} ({count} customer)."
         return f"Total owed by customers: {amount} across {count} customer(s)."
 
     if qtype == "top_debtor":
         customer = facts.get("customer")
         amount = facts.get("balance_naira", "N0")
         if not customer:
-            return "Nobody dey owe you right now." if is_pidgin else "Nobody owes you right now."
-        if is_pidgin:
-            return f"Na {customer} owe you pass: {amount}."
+            if lang == "yo": return "Ko si eni to je yin ni gbese lowolowo."
+            if lang == "ha": return "Babu wanda yake bin ku bashi a yanzu."
+            if lang == "ig": return "O nweghi onye ji gi ugwo ugbu a."
+            if lang == "pcm": return "Nobody dey owe you right now."
+            return "Nobody owes you right now."
+        if lang == "yo": return f"{customer} lo je yin ni gbese julo: {amount}."
+        if lang == "ha": return f"{customer} ne ya fi bin ku bashi: {amount}."
+        if lang == "ig": return f"{customer} kacha ji gi ugwo: {amount}."
+        if lang == "pcm": return f"Na {customer} owe you pass: {amount}."
         return f"{customer} owes you the most: {amount}."
 
     if qtype == "customer_balance":
-        customer = facts.get("customer") or "Customer"
+        customer = facts.get("customer") or ("Onibara" if lang == "yo" else ("Abokin ciniki" if lang == "ha" else ("Onye ahia" if lang == "ig" else "Customer")))
         amount = facts.get("balance_naira", "N0")
         if facts.get("balance_kobo", 0) <= 0:
-            return f"{customer} no dey owe you any money." if is_pidgin else f"{customer} does not owe any money."
-        if is_pidgin:
-            return f"{customer} dey owe you {amount}."
+            if lang == "yo": return f"{customer} ko je yin ni owo kankan."
+            if lang == "ha": return f"{customer} baya bin ku kowane bashi."
+            if lang == "ig": return f"{customer} ejighi gi ego obula."
+            if lang == "pcm": return f"{customer} no dey owe you any money."
+            return f"{customer} does not owe any money."
+        if lang == "yo": return f"{customer} je yin ni {amount}."
+        if lang == "ha": return f"{customer} yana bin ku {amount}."
+        if lang == "ig": return f"{customer} ji gi ugwo {amount}."
+        if lang == "pcm": return f"{customer} dey owe you {amount}."
         return f"{customer} owes {amount}."
 
     if qtype == "sales_period":
         period = facts.get("period", "period").replace("_", " ")
         amount = facts.get("total_naira", "N0")
         count = facts.get("count", 0)
-        if is_pidgin:
-            return f"Sales for {period}: {amount} ({count} sales)."
+        if lang == "yo": return f"Tita ({period}): {amount} (tita {count})."
+        if lang == "ha": return f"Sayarwa ({period}): {amount} (sayarwa {count})."
+        if lang == "ig": return f"Ahia ({period}): {amount} (ahia {count})."
+        if lang == "pcm": return f"Sales for {period}: {amount} ({count} sales)."
         return f"Sales ({period}): {amount} ({count} sales)."
 
     if qtype == "expenses_period":
         period = facts.get("period", "period").replace("_", " ")
         amount = facts.get("total_naira", "N0")
-        if is_pidgin:
-            return f"Expenses for {period}: {amount}."
+        if lang == "yo": return f"Inawo ({period}): {amount}."
+        if lang == "ha": return f"Kudin da aka kashe ({period}): {amount}."
+        if lang == "ig": return f"Ego mefuru ({period}): {amount}."
+        if lang == "pcm": return f"Expenses for {period}: {amount}."
         return f"Expenses ({period}): {amount}."
 
     if qtype in ("profit_period", "profit_estimate"):
@@ -644,19 +665,31 @@ def fallback_wording(facts: dict, lang: str = "en") -> str:
         profit = facts.get("profit_naira", "N0")
         sales = facts.get("sales_naira", "N0")
         expenses = facts.get("expenses_naira", "N0")
-        if is_pidgin:
-            return f"Estimated profit for {period}: {profit} (Sales: {sales}, Expenses: {expenses})."
+        if lang == "yo": return f"Ere ti a fo ri ba ({period}): {profit} (Tita: {sales}, Inawo: {expenses})."
+        if lang == "ha": return f"Kimanin riba ({period}): {profit} (Sayarwa: {sales}, Kudin kashewa: {expenses})."
+        if lang == "ig": return f"Ego uru atumatu ({period}): {profit} (Ahia: {sales}, Ego mefuru: {expenses})."
+        if lang == "pcm": return f"Estimated profit for {period}: {profit} (Sales: {sales}, Expenses: {expenses})."
         return f"Profit estimate ({period}): {profit} (Sales: {sales}, Expenses: {expenses})."
 
     if qtype == "best_sellers":
         items = facts.get("items", [])
         period = facts.get("period", "period").replace("_", " ")
         if not items:
+            if lang == "yo": return "Ko si eru to ta ni akoko yi."
+            if lang == "ha": return "Babu kayan da aka sayar a wannan lokacin."
+            if lang == "ig": return "O nweghi ahia e rere n'oge a."
             return "No items sold in this period."
-        header = f"Items wey sell pass ({period}):" if is_pidgin else f"Top sellers ({period}):"
+        if lang == "yo": header = f"Awon eru to ta julo ({period}):"
+        elif lang == "ha": header = f"Kayan da aka fi sayarwa ({period}):"
+        elif lang == "ig": header = f"Ngwa ahia kacha ree ({period}):"
+        elif lang == "pcm": header = f"Items wey sell pass ({period}):"
+        else: header = f"Top sellers ({period}):"
         lines = [f"- {it['name']}: {it['qty']:g}" for it in items]
         return "\n".join([header] + lines)
 
+    if lang == "yo": return "Ko si akosile kankan."
+    if lang == "ha": return "Babu bayanai da aka samu."
+    if lang == "ig": return "Enweghi ihe ndekọ achọpụtara."
     return "No records found."
 
 

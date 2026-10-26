@@ -106,15 +106,23 @@ class MockLLM:
             'twenty': '20', 'thirty': '30', 'forty': '40', 'fifty': '50',
             'sixty': '60', 'seventy': '70', 'eighty': '80', 'ninety': '90',
             'hundred': '100', 'thousand': '000',
-            'ookan': '1', 'meji': '2', 'meta': '3', 'merin': '4', 'marun': '5',
+            'ookan': '1', 'enikan': '1', 'meji': '2', 'meta': '3', 'merin': '4', 'marun': '5',
+            'mefa': '6', 'meje': '7', 'mejo': '8', 'mesan': '9', 'mewa': '10',
+            'ogun': '20', 'ogbon': '30', 'ogoji': '40', 'aadota': '50',
+            'ogorun': '100', 'eegberun': '000', 'egberun': '000',
             'daya': '1', 'biyu': '2', 'uku': '3', 'hudu': '4', 'biyar': '5',
+            'shida': '6', 'bakwai': '7', 'takwas': '8', 'tara': '9', 'goma': '10',
+            'ashirin': '20', 'talatin': '30', "arba'in": '40', 'hamsin': '50',
+            'dari': '100', 'dubu': '000',
             'otu': '1', 'abuo': '2', 'ato': '3', 'ano': '4', 'ise': '5',
+            'isii': '6', 'asaa': '7', 'asato': '8', 'itolu': '9', 'iri': '10',
+            'nari': '100', 'puku': '000',
         }
         for w, d in word_map.items():
             user_norm = re.sub(rf'\b{w}\b', d, user_norm)
 
         # Normalize currency phrases safely without octal escape collisions
-        user_norm = re.sub(r'(\d+)\s+k\b', r'\g<1>k', user_norm)
+        user_norm = re.sub(r'(\d+)\s*k\b', r'\g<1>000', user_norm)
         user_norm = re.sub(r'(\d+)\s+000\b', r'\g<1>000', user_norm)
         user_norm = re.sub(r'(\d+)\s+(\d{3})\b', r'\g<1>\g<2>', user_norm)
 
@@ -177,12 +185,15 @@ class MockLLM:
             }
 
         # Sales (sell / sold / sale / buy / bought / ta / sayar / erere / bags / to ...)
-        is_sale = any(w in user_norm for w in ("sell", "sold", "sale", "buy", "bought", "ta ", "mo ta", "tita", "sayar", "erere", "ree", "give", "dash", "collect", "together", "na "))
+        is_sale = any(w in user_norm for w in (
+            "sell", "sold", "sale", "buy", "bought", "ta ", "mo ta", "tita", "sayar", "sayarwa",
+            "erere", "ree", "give", "dash", "collect", "together", "na ", "zuba", "gbese", "bashi", "ugwo"
+        ))
         all_num_matches = [int(n.replace(',', '')) for n in re.findall(r'\b\d+\b', user_norm)]
 
         if is_sale or len(all_num_matches) > 0:
             # Look for quantity explicitly tied to a unit
-            m_qty = re.search(r'\b(\d+)\s*(bag|carton|sachet|piece|unit|kg|crate|pack|bundle|paint|mudu|derica|cup)s?\b', user_norm)
+            m_qty = re.search(r'\b(\d+)\s*(bag|buhu|buhunan|akpa|apo|carton|sachet|piece|unit|kg|crate|pack|bundle|paint|mudu|derica|cup)s?\b', user_norm)
             qty = 1
             unit = "unit"
             qty_val = None
@@ -191,22 +202,22 @@ class MockLLM:
                 unit = m_qty.group(2)
                 qty_val = qty
 
-            # Look for trade commodity
-            m_item = re.search(r'\b(rice|beans|indomie|garri|oil|sugar|fuel|cement|milo|yam|provisions|bread|eggs|meat|fish|soap|drinks|flour|biscuit|spaghetti|semovita|milk|groundnut)\b', user_norm)
+            # Look for trade commodity (supports English, Pidgin, Yoruba, Hausa, Igbo)
+            m_item = re.search(r'\b(rice|iresi|shinkafa|osikapa|beans|ewa|wake|agwa|indomie|garri|oil|epo|mai|mmanu|sugar|fuel|cement|milo|yam|isu|doya|ji|provisions|bread|eggs|meat|eran|nama|anu|fish|eja|kifi|azu|soap|ose|sabulu|ncha|drinks|flour|biscuit|spaghetti|semovita|milk|groundnut)\b', user_norm)
             item = m_item.group(1) if m_item else "goods"
 
             # Parse numbers (exclude small quantity if unit was matched)
             nums = [n for n in all_num_matches if n != qty_val or n >= 100]
 
             # Look for paid amount explicitly
-            m_paid = re.search(r'(?:pay|paid|san|biya|kwuru|bin pay)\s*(\d[\d,]*k?)', user_norm)
+            m_paid = re.search(r'(?:pay|paid|san|biya|kwuru|bin pay|o san|ya biya|o kwuru)\s*(\d[\d,]*k?)', user_norm)
             paid_val = 0
             if m_paid:
                 raw_p = m_paid.group(1).replace(",", "")
                 paid_val = int(float(raw_p[:-1]) * 1000) if raw_p.endswith("k") else (int(raw_p) if raw_p.isdigit() else 0)
 
             # Look for debt / owe amount
-            m_owe = re.search(r'(?:owe|balance|remain|own|dey may|gbese|bashi|ugwo)\s*(\d[\d,]*k?)', user_norm)
+            m_owe = re.search(r'(?:owe|balance|remain|own|dey owe|gbese|o ku|ku|bashi|ragowar|ugwo|foduru)\s*(\d[\d,]*k?)', user_norm)
             owe_val = 0
             if m_owe:
                 raw_o = m_owe.group(1).replace(",", "")
@@ -221,18 +232,25 @@ class MockLLM:
             elif owe_val > 0 and owe_val < total_amt:
                 payment = "partial"
                 amount_paid = total_amt - owe_val
-            elif any(w in user_norm for w in ("credit", "never pay", "no pay", "not pay")) or (owe_val >= total_amt and total_amt > 0):
+            elif any(w in user_norm for w in ("credit", "never pay", "no pay", "not pay", "gbese", "bashi", "ugwo", "ko san", "bai biya", "akwughi")) or (owe_val >= total_amt and total_amt > 0):
                 payment = "credit"
                 amount_paid = 0
             else:
                 payment = "cash"
                 amount_paid = total_amt
 
-            # Extract customer name
-            m_cust = re.search(r'(?:to|give|fun|ga|nye)\s+([a-zA-Z]+)', user_norm)
+            # Extract customer name (across English, Pidgin, Yoruba, Hausa, Igbo)
+            m_cust = re.search(r'(?:to|give|fun|ga|nye)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)', user_norm)
             if not m_cust:
-                m_cust = re.search(r'([a-zA-Z]+)\s+(?:buy|collect|bought|bin pay|paid)', user_norm)
-            cust = m_cust.group(1).title() if m_cust else "Customer"
+                m_cust = re.search(r'([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(?:buy|collect|bought|bin pay|paid|san|ya biya|kwuru)', user_norm)
+            
+            cust = "Customer"
+            if m_cust:
+                candidate = m_cust.group(1).strip()
+                # Exclude common tokens
+                stop_words = {"cash", "credit", "rice", "beans", "goods", "oil", "garri", "fuel", "carton", "bag"}
+                if candidate.lower() not in stop_words:
+                    cust = candidate.title()
 
             unit_price = int(total_amt / qty) if qty > 0 and total_amt > 0 else total_amt
 

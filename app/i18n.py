@@ -1,7 +1,7 @@
 """Multi-language UI strings and translation resolution for BusinessPadi.
 
 Rules:
-- Unreviewed languages (ui_reviewed=False) fall back to English/Pidgin.
+- Target language string is returned whenever available.
 - Missing keys fall back to English.
 - Formats interpolated kwargs cleanly.
 """
@@ -30,6 +30,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "not_understood": "Sorry, I didn't understand. Please say it again or type it.",
         "other_language": "Other language",
         "language_recorded": "Thank you! We have recorded your interest in {language}.",
+        "issue": "Issue",
+        "receipt": "Receipt",
+        "invoice": "Invoice",
+        "quote": "Quote",
     },
     "pcm": {
         "sale": "Sale", "expense": "Expense", "payment_received": "Money wey dem pay",
@@ -52,6 +56,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "not_understood": "Sorry, I no understand. Abeg talk am again or type am.",
         "other_language": "Other language",
         "language_recorded": "Thank you! We don record say you want {language}.",
+        "issue": "Issue",
+        "receipt": "Receipt",
+        "invoice": "Invoice",
+        "quote": "Price list",
     },
     "yo": {
         "sale": "Tita", "expense": "Inawo", "payment_received": "Owo ti a gba",
@@ -74,6 +82,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "not_understood": "E ma binu, n ko ye mi. E jowo so leekan si tabi ko o sile.",
         "other_language": "Ede miran",
         "language_recorded": "E se! A ti ko akosile wipe e fe ede {language}.",
+        "issue": "Fi ranse",
+        "receipt": "Iwe eri owo",
+        "invoice": "Iwe owo",
+        "quote": "Iye owo eru",
     },
     "ha": {
         "sale": "Sayarwa", "expense": "Kudi da aka kashe", "payment_received": "Kudi da aka biya",
@@ -96,6 +108,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "not_understood": "Yi hakuri, ban gane ba. Da fatan za a sake fada ko rubuta.",
         "other_language": "Wani yare",
         "language_recorded": "Mun gode! Mun rubuta sha'awar ku ga yaren {language}.",
+        "issue": "Bayarwa",
+        "receipt": "Rasit",
+        "invoice": "Daftarin kudi",
+        "quote": "Farashin kaya",
     },
     "ig": {
         "sale": "Ahia", "expense": "Ego mefuru", "payment_received": "Ego anataara",
@@ -118,6 +134,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "not_understood": "Ndo, aghotaghim. Biko kwuo ya ozo ma o bu dee ya.",
         "other_language": "Asusu ozo",
         "language_recorded": "Daalu! Anyi edekoolo na i choro asusu {language}.",
+        "issue": "Nye",
+        "receipt": "Akwukwo ego",
+        "invoice": "Akwukwo ugwo",
+        "quote": "Onu ahia",
     },
 }
 
@@ -125,20 +145,9 @@ STRINGS: dict[str, dict[str, str]] = {
 def t(lang: str, key: str, **kwargs: Any) -> str:
     """Translates key to target language.
 
-    Falls back to English if the language is unreviewed or if the key is missing.
+    Returns the target language string if defined, otherwise falls back to English.
     """
-    try:
-        from config.languages import LANGUAGES
-        lang_meta = LANGUAGES.get(lang, {})
-        # If language is not reviewed by a native speaker, fall back to English/Pidgin
-        if not lang_meta.get("ui_reviewed", False) and lang not in ("en", "pcm"):
-            effective_lang = "en"
-        else:
-            effective_lang = lang
-    except Exception:
-        effective_lang = lang if lang in ("en", "pcm") else "en"
-
-    text = STRINGS.get(effective_lang, {}).get(key)
+    text = STRINGS.get(lang, {}).get(key)
     if not text:
         text = STRINGS.get("en", {}).get(key, key)
 

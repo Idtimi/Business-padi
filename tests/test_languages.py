@@ -42,11 +42,12 @@ def test_language_registry_keys_and_levels():
     # Supported
     assert is_supported("pcm") is True
     assert is_supported("en") is True
+    assert is_supported("yo") is True
+    assert is_supported("ha") is True
+    assert is_supported("ig") is True
 
     # Untested / Beta
-    assert is_beta_or_untested("yo") is True
-    assert is_beta_or_untested("ha") is True
-    assert is_beta_or_untested("ig") is True
+    assert is_beta_or_untested("ful") is True
 
     # Planned
     assert is_assist_or_planned("efi") is True
@@ -87,18 +88,15 @@ def test_number_word_parsing():
 
 
 def test_i18n_ui_reviewed_fallback():
-    """Verify unreviewed languages fall back to English/Pidgin UI strings."""
-    # Reviewed: Nigerian Pidgin returns native strings
+    """Verify reviewed languages return native strings and unreviewed fall back to English."""
+    # Reviewed: Nigerian Pidgin, Yoruba, Hausa, Igbo return native strings
     assert t("pcm", "saved") == "I don save am."
+    assert t("yo", "saved") == "A ti fi pamo."
+    assert t("ha", "saved") == "An ajiye."
+    assert t("ig", "saved") == "E chekwaala ya."
 
-    # Unreviewed in config (yo, ha, ig have ui_reviewed=False)
-    # Should fall back to English
-    assert t("yo", "saved") == "Saved."
-    assert t("ha", "saved") == "Saved."
-
-    # If reviewed is True, native translation activates immediately
-    with patch.dict(LANGUAGES["yo"], {"ui_reviewed": True}):
-        assert t("yo", "saved") == "A ti fi pamo."
+    # Missing keys fall back to English
+    assert t("yo", "nonexistent_key_xyz") == "nonexistent_key_xyz"
 
 
 def test_strict_confirmation_for_non_supported_languages():
@@ -112,15 +110,17 @@ def test_strict_confirmation_for_non_supported_languages():
         lines=[Line(name="rice", qty=3, unit="bag", unit_price_kobo=4250000, line_total_kobo=4250000)],
     )
 
-    # For supported language (pcm or en): normal confirmation without separate warning
+    # For supported languages (pcm, en, yo): normal confirmation without separate warning
     conf_supported = confirmation_text("pcm", val, speech_lang="pcm")
-    assert "TOTAL AMOUNT:" not in conf_supported
+    assert "TOTAL" not in conf_supported
+    conf_yo = confirmation_text("yo", val, speech_lang="yo")
+    assert "TOTAL AMOUNT:" not in conf_yo
 
-    # For untested/beta language (yo): isolated total amount line present
-    conf_beta = confirmation_text("en", val, speech_lang="yo")
-    assert "TOTAL AMOUNT:" in conf_beta
+    # For untested/beta language (ful): isolated total amount line present
+    conf_beta = confirmation_text("en", val, speech_lang="ful")
+    assert "TOTAL" in conf_beta
     assert "42,500" in conf_beta
-    assert "confirm this amount is exact" in conf_beta or "TOTAL AMOUNT" in conf_beta
+    assert "confirm this amount is exact" in conf_beta or "TOTAL" in conf_beta
 
 
 def test_other_language_button_records_demand():
@@ -244,3 +244,129 @@ def test_tts_client_caching_and_provider_dispatch():
         # Disabled provider
         none_client = TTSClient(provider="none", cache_dir=tmp_path)
         assert none_client.generate_speech("Hello") is None
+
+
+def test_end_to_end_multilingual_and_code_switching():
+    """Verify that whatever language is chosen, everything is in that language,
+    and code-switching (English + native tongue mix) is parsed seamlessly."""
+    import uuid
+    from app.pipeline.router import handle_button, handle_text
+
+    db = SessionLocal()
+    try:
+        # 1. Yoruba trader test
+        u_yo = m.User(
+            channel="mock",
+            channel_user_id=f"yo_trader_{uuid.uuid4().hex[:6]}",
+            state="DONE",
+            language="yo",
+            state_data={"speech_language": "yo"},
+        )
+        db.add(u_yo)
+        db.flush()
+        b_yo = m.Business(owner_user_id=u_yo.id, name="Idera Provisions")
+        db.add(b_yo)
+        db.commit()
+
+        # Code-switched Yoruba + English: "Mo ta 2 bags of rice fun Emeka 80k"
+        rep_yo = handle_text(
+            db, b_yo.id, u_yo.id,
+            "Mo ta 2 bags of rice fun Emeka 80k",
+            f"msg_{uuid.uuid4().hex[:6]}",
+            lang="yo",
+        )
+        assert len(rep_yo) == 1
+        conf_yo = rep_yo[0]
+        # Text must be in Yoruba
+        assert "Tita:" in conf_yo.text
+        assert "Onibara: Emeka" in conf_yo.text
+        assert "San:" in conf_yo.text
+        assert "80,000" in conf_yo.text
+        assert "TOTAL AMOUNT:" not in conf_yo.text
+        # Buttons must be in Yoruba
+        btn_dict_yo = {btn[0].split(":")[0]: btn[1] for btn in conf_yo.buttons}
+        assert btn_dict_yo.get("save") == "Fi pamo"
+        assert btn_dict_yo.get("edit") == "Tun se"
+        assert btn_dict_yo.get("cancel") == "Fagile"
+
+        # Click save
+        save_yo_id = int([b[0].split(":")[1] for b in conf_yo.buttons if b[0].startswith("save:")][0])
+        saved_yo = handle_button(db, b_yo.id, u_yo.id, "save", save_yo_id, lang="yo")
+        assert len(saved_yo) == 1
+        assert saved_yo[0].text == "A ti fi pamo."
+
+        # 2. Hausa trader test
+        u_ha = m.User(
+            channel="mock",
+            channel_user_id=f"ha_trader_{uuid.uuid4().hex[:6]}",
+            state="DONE",
+            language="ha",
+            state_data={"speech_language": "ha"},
+        )
+        db.add(u_ha)
+        db.flush()
+        b_ha = m.Business(owner_user_id=u_ha.id, name="Kano Stores")
+        db.add(b_ha)
+        db.commit()
+
+        # Code-switched Hausa + English: "Sayar 2 bags of rice to Musa 40k"
+        rep_ha = handle_text(
+            db, b_ha.id, u_ha.id,
+            "Sayar 2 bags of rice to Musa 40k",
+            f"msg_{uuid.uuid4().hex[:6]}",
+            lang="ha",
+        )
+        assert len(rep_ha) == 1
+        conf_ha = rep_ha[0]
+        assert "Sayarwa:" in conf_ha.text
+        assert "Abokin ciniki: Musa" in conf_ha.text
+        assert "An biya:" in conf_ha.text
+        assert "40,000" in conf_ha.text
+        btn_dict_ha = {btn[0].split(":")[0]: btn[1] for btn in conf_ha.buttons}
+        assert btn_dict_ha.get("save") == "Ajiye"
+        assert btn_dict_ha.get("edit") == "Gyara"
+        assert btn_dict_ha.get("cancel") == "Soke"
+
+        save_ha_id = int([b[0].split(":")[1] for b in conf_ha.buttons if b[0].startswith("save:")][0])
+        saved_ha = handle_button(db, b_ha.id, u_ha.id, "save", save_ha_id, lang="ha")
+        assert len(saved_ha) == 1
+        assert saved_ha[0].text == "An ajiye."
+
+        # 3. Igbo trader test
+        u_ig = m.User(
+            channel="mock",
+            channel_user_id=f"ig_trader_{uuid.uuid4().hex[:6]}",
+            state="DONE",
+            language="ig",
+            state_data={"speech_language": "ig"},
+        )
+        db.add(u_ig)
+        db.flush()
+        b_ig = m.Business(owner_user_id=u_ig.id, name="Onitsha Trade")
+        db.add(b_ig)
+        db.commit()
+
+        # Code-switched Igbo + English: "Sell 2 bags rice to Chidi 30k"
+        rep_ig = handle_text(
+            db, b_ig.id, u_ig.id,
+            "Sell 2 bags rice to Chidi 30k",
+            f"msg_{uuid.uuid4().hex[:6]}",
+            lang="ig",
+        )
+        assert len(rep_ig) == 1
+        conf_ig = rep_ig[0]
+        assert "Ahia:" in conf_ig.text
+        assert "Onye ahia: Chidi" in conf_ig.text
+        assert "A kwuola:" in conf_ig.text
+        assert "30,000" in conf_ig.text
+        btn_dict_ig = {btn[0].split(":")[0]: btn[1] for btn in conf_ig.buttons}
+        assert btn_dict_ig.get("save") == "Chekwaa"
+        assert btn_dict_ig.get("edit") == "Gbanwee"
+        assert btn_dict_ig.get("cancel") == "Kagbuo"
+
+        save_ig_id = int([b[0].split(":")[1] for b in conf_ig.buttons if b[0].startswith("save:")][0])
+        saved_ig = handle_button(db, b_ig.id, u_ig.id, "save", save_ig_id, lang="ig")
+        assert len(saved_ig) == 1
+        assert saved_ig[0].text == "E chekwaala ya."
+    finally:
+        db.close()

@@ -36,7 +36,40 @@ def save_and_resize_logo(image_bytes: bytes, business_id: int, max_size=(512, 51
 
 
 def help_menu(lang: str = "en") -> str:
-    if lang == "pcm":
+    if lang == "yo":
+        return (
+            "Iranlowo Business Padi:\n"
+            "- Se akosile tita: 'Mo ta 3 bags of rice fun Mama Ngozi, 40k each, cash'\n"
+            "- Se akosile inawo: 'Mo ra fuel generator 5000 naira'\n"
+            "- Owo ti a gba: 'Mama Ngozi ti san 20,000'\n"
+            "- Awon to je gbese: 'Tani o je mi ni gbese julo?' tabi 'Elo ni gbogbo gbese mi?'\n"
+            "- Wo tita: 'Elo ni mo ta lose yi?'\n"
+            "- Yi eto pada: ko /settings\n"
+            "- E le fi ohun ranse tabi ko o sile."
+        )
+    elif lang == "ha":
+        return (
+            "Taimakon Business Padi:\n"
+            "- Rubuta sayarwa: 'Na sayar da buhu 3 na shinkafa ga Musa, 40k kowanne, kudi hannu'\n"
+            "- Rubuta kudin da aka kashe: 'Na sayi man janareta na naira 5000'\n"
+            "- Biyan bashi: 'Musa ya biya 20,000'\n"
+            "- Masu bashi: 'Waye ya fi bina bashi?' ko 'Nawa ne jimillar bashi?'\n"
+            "- Duba sayarwa: 'Nawa na sayar a wannan makon?'\n"
+            "- Canza saiti: rubuta /settings\n"
+            "- Za ka iya tura muryar murya ko ka rubuta."
+        )
+    elif lang == "ig":
+        return (
+            "Enyemaka Business Padi:\n"
+            "- Dekoo ahia: 'E rerem akpa osikapa 3 nye Chidi, 40k nke obula, ego aka'\n"
+            "- Dekoo ego mefuru: 'A zurum mmanu generator 5000 naira taa'\n"
+            "- Ego anataara: 'Chidi akwula 20,000'\n"
+            "- Ndi ji ugwo: 'Onye kacha ji m ugwo?' ma obu 'Ego ole ka ndi mmadu ji m?'\n"
+            "- Lee ahia e rere: 'Ego ole ka m rere na izu a?'\n"
+            "- Gbanwee ntọala: dee /settings\n"
+            "- I nwere ike ikwu okwu n'olu ma obu dee ya ede."
+        )
+    elif lang == "pcm":
         return (
             "Business Padi Help:\n"
             "- Record sale: 'I sell 3 bags rice to Mama Ngozi, 40k each, cash'\n"

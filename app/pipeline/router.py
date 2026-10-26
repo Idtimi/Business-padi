@@ -71,7 +71,7 @@ def confirmation_text(lang: str, v: Validated, speech_lang: str | None = None) -
             from config.languages import is_supported
             if not is_supported(speech_lang):
                 out.append("")
-                out.append(f"TOTAL AMOUNT: {fmt_naira(v.total_kobo)}")
+                out.append(f"{t(lang, 'total').upper()}: {fmt_naira(v.total_kobo)}")
                 out.append(t(lang, "strict_confirm_amount", amount=fmt_naira(v.total_kobo)))
         except Exception:
             pass
@@ -194,7 +194,7 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today, 
             }
             p = pending.create(session, business_id, user_id, f"issue_{doc_kind}", payload)
             session.commit()
-            buttons = [(f"issue:{p.id}", "Issue"), (f"cancel:{p.id}", t(lang, "cancel"))]
+            buttons = [(f"issue:{p.id}", t(lang, "issue")), (f"cancel:{p.id}", t(lang, "cancel"))]
             replies.append(Reply(preview, buttons=buttons, kind="confirm", pending_id=p.id))
             continue
         if v.intent not in ledger.SAVEABLE:
@@ -406,6 +406,14 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
 
 def _saved_text(session, business_id, tx, lang) -> str:
     if tx.status == "pending":
+        if lang == "yo":
+            return f"A ti se akosile tita {fmt_naira(tx.total_kobo)}, sugbon yoo duro de ase oga."
+        elif lang == "ha":
+            return f"An rubuta sayarwar {fmt_naira(tx.total_kobo)}, amma zai jira amincewar mai shago."
+        elif lang == "ig":
+            return f"E dekoolo ahia nke {fmt_naira(tx.total_kobo)}, mana o ga-eche nkwado onye nwe ulo ahia."
+        elif lang == "pcm":
+            return f"Sale for {fmt_naira(tx.total_kobo)} don record, but e go wait make oga approve am."
         return f"Sale for {fmt_naira(tx.total_kobo)} recorded, but stays pending until the owner approves."
     text = t(lang, "saved")
     if tx.customer_id and tx.kind in {"sale", "payment_received"}:
