@@ -34,14 +34,14 @@ class MockLLM:
                     "query": {"type": "top_debtor", "params": {}},
                 }],
             }
-        if "send receipt" in user_norm or "receipt for that sale" in user_norm:
+        if "receipt" in user_norm:
             return {
                 "language_detected": "english",
                 "transactions": [{
                     "intent": "receipt",
                 }],
             }
-        if "send invoice" in user_norm or "invoice for that sale" in user_norm or "create invoice" in user_norm:
+        if "invoice" in user_norm:
             return {
                 "language_detected": "english",
                 "transactions": [{

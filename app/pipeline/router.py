@@ -111,7 +111,10 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today, 
     for i, x in enumerate(result.transactions):
         v = validate(x)
         if v.problems:
-            replies.append(_ask(session, business_id, user_id, text, v.problems[0]))
+            prob = v.problems[0]
+            if "sorry, i no understand" in prob.lower() or "not understand" in prob.lower() or "abeg" in prob.lower():
+                prob = t(lang, "not_understood")
+            replies.append(_ask(session, business_id, user_id, text, prob))
             continue
         if v.intent == "chitchat":
             continue  # no filler messages (they cost money)
