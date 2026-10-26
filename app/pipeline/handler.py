@@ -91,9 +91,13 @@ async def _handle_voice(channel: Channel, session: Session, biz: Business | None
         if biz is None:
             return [router.Reply("Please complete shop setup first.")]
 
-        return router.handle_text(session, biz.id, user.id, transcript.text,
-                                  msg.message_id, ui_lang, channel=msg.channel,
-                                  is_voice=True, speech_lang=speech_lang)
+        replies = router.handle_text(session, biz.id, user.id, transcript.text,
+                                     msg.message_id, ui_lang, channel=msg.channel,
+                                     is_voice=True, speech_lang=speech_lang)
+        if transcript.text and replies:
+            first_reply = replies[0]
+            first_reply.text = f"Heard: \"{transcript.text}\"\n\n{first_reply.text}"
+        return replies
     except AudioTooLong:
         max_s = settings.max_voice_seconds
         return [router.Reply(f"Voice note too long. Please keep it under {max_s} seconds.")]
