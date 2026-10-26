@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -5,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = "dev"
-    base_url: str = "https://example.ngrok.app"
+    base_url: str = os.environ.get("RENDER_EXTERNAL_URL") or "https://business-padi.onrender.com"
     database_url: str = "sqlite:///./ledger.db"
     tz: str = "Africa/Lagos"
 
