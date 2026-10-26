@@ -299,18 +299,29 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         user.state = "LOGO"
         session.commit()
 
-        prompt = (
-            "Send your logo as a photo, or tap [Skip]"
-            if not is_pidgin else
-            "Send your logo as photo, or tap [Skip]"
-        )
-        buttons = [("logo:skip", "Skip")]
+        # Localized LOGO prompt
+        if user.language == "yo":
+            prompt = "Fi aami soobu yin (logo) ranse gege bi aworan, tabi ki e te [Fo o kọja]:"
+            buttons = [("logo:skip", "Fo o kọja")]
+        elif user.language == "ha":
+            prompt = "Tura tambarin shagon ku a matsayin hoto, ko danna [Tsallake]:"
+            buttons = [("logo:skip", "Tsallake")]
+        elif user.language == "ig":
+            prompt = "Ziga akara ulo ahia gi (logo) dika foto, ma obu pia [Mfegharịa]:"
+            buttons = [("logo:skip", "Mfegharịa")]
+        elif user.language == "pcm":
+            prompt = "Send your logo as photo, or tap [Skip]:"
+            buttons = [("logo:skip", "Skip")]
+        else:
+            prompt = "Send your logo as a photo, or tap [Skip]:"
+            buttons = [("logo:skip", "Skip")]
+
         return [Reply(prompt, buttons=buttons, kind="confirm")]
 
     # State: LOGO
     if user.state == "LOGO":
         biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
-        skipped = (btn == "logo:skip") or text.lower().strip() in {"1", "skip", "no", "later"}
+        skipped = (btn == "logo:skip") or text.lower().strip() in {"1", "skip", "no", "later", "fo o koja", "tsallake", "mfegharia"}
 
         if msg.kind == "image" and msg.media_ref:
             try:
@@ -324,33 +335,82 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         user.state = "BRAND_COLOR"
         session.commit()
 
-        prompt = (
-            "Pick a brand colour for your receipts:\n\n"
-            "[1] Orange (Default #FF6A13)\n"
-            "[2] Navy Blue (#0D1F45)\n"
-            "[3] Forest Green (#16A34A)\n"
-            "[4] Gold / Amber (#D97706)\n"
-            "[5] Teal (#0D9488)\n"
-            "[6] Royal Blue (#2563EB)\n"
-            "[7] Royal Purple (#7C3AED)\n"
-            "[8] Crimson Red (#DC2626)\n"
-            "[9] Rose Pink (#E11D48)\n"
-            "[10] Slate Charcoal (#334155)\n\n"
-            "Reply with a number (1-10), a color name (e.g. 'Purple', 'Gold', 'Teal'), or any custom hex code (e.g. '#7C3AED')."
-            if not is_pidgin else
-            "Pick a color for your receipts:\n\n"
-            "[1] Orange (Default #FF6A13)\n"
-            "[2] Navy Blue (#0D1F45)\n"
-            "[3] Forest Green (#16A34A)\n"
-            "[4] Gold / Amber (#D97706)\n"
-            "[5] Teal (#0D9488)\n"
-            "[6] Royal Blue (#2563EB)\n"
-            "[7] Royal Purple (#7C3AED)\n"
-            "[8] Crimson Red (#DC2626)\n"
-            "[9] Rose Pink (#E11D48)\n"
-            "[10] Slate Charcoal (#334155)\n\n"
-            "Reply with number (1-10), color name (e.g. 'Purple', 'Gold', 'Teal'), or any hex code (e.g. '#7C3AED')."
-        )
+        # Localized BRAND COLOR prompt
+        if user.language == "yo":
+            prompt = (
+                "Yan awo (colour) ti e fe ki o han lori iwe-owo (receipt) yin:\n\n"
+                "[1] Osan / Orange (#FF6A13)\n"
+                "[2] Bulu Dudu / Navy (#0D1F45)\n"
+                "[3] Eweko / Forest Green (#16A34A)\n"
+                "[4] Wura / Gold (#D97706)\n"
+                "[5] Omi Okun / Teal (#0D9488)\n"
+                "[6] Bulu / Royal Blue (#2563EB)\n"
+                "[7] Pọpu / Royal Purple (#7C3AED)\n"
+                "[8] Pupa / Crimson Red (#DC2626)\n"
+                "[9] Pinki / Rose Pink (#E11D48)\n"
+                "[10] Eedu / Slate Charcoal (#334155)\n\n"
+                "Te nomba (1-10) tabi oruko awo naa."
+            )
+        elif user.language == "ha":
+            prompt = (
+                "Zabi launi don rasitocin ku:\n\n"
+                "[1] Orange (#FF6A13)\n"
+                "[2] Navy Blue (#0D1F45)\n"
+                "[3] Kore / Forest Green (#16A34A)\n"
+                "[4] Zinariya / Gold (#D97706)\n"
+                "[5] Teal (#0D9488)\n"
+                "[6] Shu'udi / Royal Blue (#2563EB)\n"
+                "[7] Royal Purple (#7C3AED)\n"
+                "[8] Ja / Crimson Red (#DC2626)\n"
+                "[9] Rose Pink (#E11D48)\n"
+                "[10] Slate Charcoal (#334155)\n\n"
+                "Tura lamba (1-10) ko sunan launi."
+            )
+        elif user.language == "ig":
+            prompt = (
+                "Họrọ agba (colour) maka risiti gi:\n\n"
+                "[1] Orange (#FF6A13)\n"
+                "[2] Navy Blue (#0D1F45)\n"
+                "[3] Akwukwo Nri / Forest Green (#16A34A)\n"
+                "[4] Olaedo / Gold (#D97706)\n"
+                "[5] Teal (#0D9488)\n"
+                "[6] Anunu / Royal Blue (#2563EB)\n"
+                "[7] Royal Purple (#7C3AED)\n"
+                "[8] Uhie / Crimson Red (#DC2626)\n"
+                "[9] Rose Pink (#E11D48)\n"
+                "[10] Slate Charcoal (#334155)\n\n"
+                "Ziga onuogugu (1-10) ma obu aha agba."
+            )
+        elif user.language == "pcm":
+            prompt = (
+                "Pick a color for your receipts:\n\n"
+                "[1] Orange (Default #FF6A13)\n"
+                "[2] Navy Blue (#0D1F45)\n"
+                "[3] Forest Green (#16A34A)\n"
+                "[4] Gold / Amber (#D97706)\n"
+                "[5] Teal (#0D9488)\n"
+                "[6] Royal Blue (#2563EB)\n"
+                "[7] Royal Purple (#7C3AED)\n"
+                "[8] Crimson Red (#DC2626)\n"
+                "[9] Rose Pink (#E11D48)\n"
+                "[10] Slate Charcoal (#334155)\n\n"
+                "Reply with number (1-10), color name (e.g. 'Purple', 'Gold', 'Teal'), or any hex code (e.g. '#7C3AED')."
+            )
+        else:
+            prompt = (
+                "Pick a brand colour for your receipts:\n\n"
+                "[1] Orange (Default #FF6A13)\n"
+                "[2] Navy Blue (#0D1F45)\n"
+                "[3] Forest Green (#16A34A)\n"
+                "[4] Gold / Amber (#D97706)\n"
+                "[5] Teal (#0D9488)\n"
+                "[6] Royal Blue (#2563EB)\n"
+                "[7] Royal Purple (#7C3AED)\n"
+                "[8] Crimson Red (#DC2626)\n"
+                "[9] Rose Pink (#E11D48)\n"
+                "[10] Slate Charcoal (#334155)\n\n"
+                "Reply with a number (1-10), a color name (e.g. 'Purple', 'Gold', 'Teal'), or any custom hex code (e.g. '#7C3AED')."
+            )
         return [Reply(prompt)]
 
     # State: BRAND_COLOR
@@ -359,16 +419,16 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         t_clean = text.lower().strip()
 
         PALETTE = {
-            "1": "#FF6A13", "orange": "#FF6A13",
+            "1": "#FF6A13", "orange": "#FF6A13", "osan": "#FF6A13",
             "2": "#0D1F45", "navy": "#0D1F45", "navy blue": "#0D1F45",
-            "3": "#16A34A", "green": "#16A34A", "forest green": "#16A34A",
-            "4": "#D97706", "gold": "#D97706", "amber": "#D97706", "yellow": "#D97706",
+            "3": "#16A34A", "green": "#16A34A", "forest green": "#16A34A", "kore": "#16A34A", "eweko": "#16A34A",
+            "4": "#D97706", "gold": "#D97706", "amber": "#D97706", "yellow": "#D97706", "wura": "#D97706", "zinariya": "#D97706", "olaedo": "#D97706",
             "5": "#0D9488", "teal": "#0D9488", "cyan": "#0D9488",
-            "6": "#2563EB", "blue": "#2563EB", "royal blue": "#2563EB",
-            "7": "#7C3AED", "purple": "#7C3AED", "violet": "#7C3AED",
-            "8": "#DC2626", "red": "#DC2626", "crimson": "#DC2626",
-            "9": "#E11D48", "pink": "#E11D48", "rose": "#E11D48",
-            "10": "#334155", "black": "#334155", "charcoal": "#334155", "slate": "#334155",
+            "6": "#2563EB", "blue": "#2563EB", "royal blue": "#2563EB", "bulu": "#2563EB", "shuudi": "#2563EB", "anunu": "#2563EB",
+            "7": "#7C3AED", "purple": "#7C3AED", "violet": "#7C3AED", "popu": "#7C3AED",
+            "8": "#DC2626", "red": "#DC2626", "crimson": "#DC2626", "pupa": "#DC2626", "ja": "#DC2626", "uhie": "#DC2626",
+            "9": "#E11D48", "pink": "#E11D48", "rose": "#E11D48", "pinki": "#E11D48",
+            "10": "#334155", "black": "#334155", "charcoal": "#334155", "slate": "#334155", "eedu": "#334155",
             "brown": "#78350F", "maroon": "#831843", "wine": "#831843",
         }
 
@@ -392,18 +452,29 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         user.state = "CONTACT"
         session.commit()
 
-        prompt = (
-            f"Brand color set to {color}. Shop address and phone for your receipts? [Skip]"
-            if not is_pidgin else
-            f"Color set to {color}. Shop address and phone for your receipts? [Skip]"
-        )
-        buttons = [("contact:skip", "Skip")]
+        # Localized CONTACT prompt
+        if user.language == "yo":
+            prompt = f"A ti yan awo {color}. E jowo ko adiresi ati nomba fon soobu yin fun iwe-owo (receipt) [Fo o kọja]:"
+            buttons = [("contact:skip", "Fo o kọja")]
+        elif user.language == "ha":
+            prompt = f"An saita launi zuwa {color}. Adireshin shago da lambar waya don rasitocin ku? [Tsallake]:"
+            buttons = [("contact:skip", "Tsallake")]
+        elif user.language == "ig":
+            prompt = f"Edobere agba dika {color}. Adreesi ulo ahia gi na akara ekwentị maka risiti gi? [Mfegharịa]:"
+            buttons = [("contact:skip", "Mfegharịa")]
+        elif user.language == "pcm":
+            prompt = f"Color set to {color}. Shop address and phone for your receipts? [Skip]:"
+            buttons = [("contact:skip", "Skip")]
+        else:
+            prompt = f"Brand color set to {color}. Shop address and phone for your receipts? [Skip]:"
+            buttons = [("contact:skip", "Skip")]
+
         return [Reply(prompt, buttons=buttons, kind="confirm")]
 
     # State: CONTACT
     if user.state == "CONTACT":
         biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
-        skipped = (btn == "contact:skip") or text.lower().strip() in {"1", "skip", "no", "later"}
+        skipped = (btn == "contact:skip") or text.lower().strip() in {"1", "skip", "no", "later", "fo o koja", "tsallake", "mfegharia"}
 
         if not skipped and text and biz:
             biz.address = text
@@ -413,11 +484,17 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         session.commit()
 
         shop_title = (biz.name if biz and biz.name else "Your shop")
-        done_text = (
-            f"All set! {shop_title} is ready.\n\nTry: tell me one sale by voice note."
-            if not is_pidgin else
-            f"All set! {shop_title} don ready.\n\nTry am: tell me one sale by voice note."
-        )
+        if user.language == "yo":
+            done_text = f"Gbogbo e ti se tan! Soobu {shop_title} ti wa ni soki.\n\nGbiyanju: so tita kan fun mi lori ohun (voice note) tabi ko o sile."
+        elif user.language == "ha":
+            done_text = f"Komai ya shirya! Shagon {shop_title} ya shirya yanzu.\n\nGwada: gaya mini sayarwa daya ta hanyar sautin murya (voice note) ko rubuta shi."
+        elif user.language == "ig":
+            done_text = f"Ihe niile adịla njikere! Ulo ahia {shop_title} adịla njikere ugbu a.\n\nNwaa ya: gwa m otu ahia site na ozi olu (voice note) ma obu dee ya ede."
+        elif user.language == "pcm":
+            done_text = f"All set! {shop_title} don ready.\n\nTry am: tell me one sale by voice note."
+        else:
+            done_text = f"All set! {shop_title} is ready.\n\nTry: tell me one sale by voice note."
+
         return [Reply(done_text)]
 
     return [Reply("Welcome back! How can I help you today?")]
