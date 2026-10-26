@@ -147,14 +147,28 @@ class MockLLM:
                 }],
             }
 
-        # Expenses (buy fuel, expense, paid rent, inawo, kudin mai, mmanu)
-        if any(w in user_norm for w in ("fuel", "diesel", "petrol", "expense", "rent", "generator", "transport", "food", "inawo", "kudin mai", "mmanu")):
+        # Check whether this sentence contains sales or trade item words
+        is_sale_indicator = bool(re.search(
+            r'\b(sell|sold|sale|buy|bought|ta|mo ta|tita|sayar|sayarwa|erere|ree|give|dash|collect|'
+            r'rice|indomie|garri|beans|sugar|cement|milo|yam|provisions|bread|eggs|meat|'
+            r'fish|soap|drinks|flour|biscuit|spaghetti|semovita|milk|groundnut|iresi|shinkafa|'
+            r'osikapa|ewa|wake|agwa|oil|epo|mai|mmanu|bag|bags|carton|cartons|crate|crates|'
+            r'piece|pieces|buhu|akpa|apo)\b',
+            user_norm
+        ))
+
+        # Expenses (buy fuel, expense, paid rent, inawo, kudin mai) - only if NOT a sale
+        is_expense_indicator = bool(re.search(
+            r'\b(fuel|diesel|petrol|generator|transport|inawo|kudin mai|kudin mota|mmanu mota)\b|\b(?:paid\s+)?rent\b|\b(?:bought|buy)\s+food\b|\bexpense[s]?\b',
+            user_norm
+        ))
+        if is_expense_indicator and not is_sale_indicator:
             m_amt = re.search(r'\b(\d[\d,]*k?)\b', user_norm)
             amt = 0
             if m_amt:
                 raw_amt = m_amt.group(1).replace(",", "")
                 amt = int(float(raw_amt[:-1]) * 1000) if raw_amt.endswith("k") else (int(raw_amt) if raw_amt.isdigit() else 0)
-            category = "fuel" if any(w in user_norm for w in ("fuel", "diesel", "petrol", "generator", "kudin mai", "mmanu")) else ("rent" if "rent" in user_norm else "general")
+            category = "fuel" if re.search(r'\b(fuel|diesel|petrol|generator|kudin mai|mmanu)\b', user_norm) else ("rent" if re.search(r'\brent\b', user_norm) else "general")
             return {
                 "language_detected": lang_detected,
                 "transactions": [{
@@ -163,16 +177,6 @@ class MockLLM:
                     "amount": amt,
                 }],
             }
-
-        # Check whether this sentence contains sales or trade item words
-        is_sale_indicator = any(w in user_norm for w in (
-            "sell", "sold", "sale", "buy", "bought", "ta ", "mo ta", "tita", "sayar", "sayarwa",
-            "erere", "ree", "give", "dash", "collect", "together", "na ", "zuba", "rice", "indomie",
-            "garri", "beans", "sugar", "cement", "milo", "yam", "provisions", "bread", "eggs", "meat",
-            "fish", "soap", "drinks", "flour", "biscuit", "spaghetti", "semovita", "milk", "groundnut",
-            "iresi", "shinkafa", "osikapa", "ewa", "wake", "agwa", "oil", "epo", "mai", "mmanu", "bag",
-            "carton", "crate", "piece", "buhu", "akpa", "apo"
-        ))
 
         # Standalone Customer Repayments (only if NOT part of a sale statement)
         has_repay_word = any(w in user_norm for w in ("paid", "don pay", "san owo", "ya biya", "akwula", "kwuru ugwo", "settle"))
@@ -222,14 +226,14 @@ class MockLLM:
             nums = [n for n in all_num_matches if n != qty_val or n >= 100]
 
             # Look for paid amount explicitly
-            m_paid = re.search(r'(?:pay|paid|san|biya|kwuru|bin pay|o san|ya biya|o kwuru)\s*(\d[\d,]*k?)', user_norm)
+            m_paid = re.search(r'\b(?:pay|paid|san|biya|kwuru|bin pay|o san|ya biya|o kwuru)\s*(?:me\s+)?(\d[\d,]*k?)', user_norm)
             paid_val = 0
             if m_paid:
                 raw_p = m_paid.group(1).replace(",", "")
                 paid_val = int(float(raw_p[:-1]) * 1000) if raw_p.endswith("k") else (int(raw_p) if raw_p.isdigit() else 0)
 
             # Look for debt / owe amount
-            m_owe = re.search(r'(?:owe|balance|remain|own|dey owe|gbese|o ku|ku|bashi|ragowar|ugwo|foduru)\s*(\d[\d,]*k?)', user_norm)
+            m_owe = re.search(r'\b(?:owe[s]?|owing|balance|remain[s]?|own|dey owe|gbese|o ku|ku|bashi|ragowar|ugwo|foduru)\s*(?:me\s+)?(\d[\d,]*k?)', user_norm)
             owe_val = 0
             if m_owe:
                 raw_o = m_owe.group(1).replace(",", "")
@@ -252,15 +256,15 @@ class MockLLM:
                 amount_paid = total_amt
 
             # Extract customer name (across English, Pidgin, Yoruba, Hausa, Igbo)
-            m_cust = re.search(r'(?:to|give|fun|ga|nye)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)', user_norm)
+            m_cust = re.search(r'\b(?:to|give|fun|ga|nye)\s+([a-zA-Z]+)', user_norm)
             if not m_cust:
-                m_cust = re.search(r'([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(?:buy|collect|bought|bin pay|paid|san|ya biya|kwuru)', user_norm)
+                m_cust = re.search(r'\b([a-zA-Z]+)\s+(?:buy|collect|bought|bin pay|paid|san|ya biya|kwuru)', user_norm)
             
             cust = "Customer"
             if m_cust:
                 candidate = m_cust.group(1).strip()
                 # Exclude common tokens and pronouns
-                stop_words = {"cash", "credit", "rice", "beans", "goods", "oil", "garri", "fuel", "carton", "bag", "e", "he", "she", "im", "dem", "am"}
+                stop_words = {"cash", "credit", "rice", "beans", "goods", "oil", "garri", "fuel", "carton", "bag", "e", "he", "she", "im", "dem", "am", "for", "on", "at", "and", "the", "my"}
                 if candidate.lower() not in stop_words and len(candidate) > 1:
                     cust = candidate.title()
 
