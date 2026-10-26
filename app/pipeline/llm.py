@@ -147,26 +147,6 @@ class MockLLM:
                 }],
             }
 
-        # Customer Repayments (paid / don pay / san owo / ya biya / akwula)
-        if any(w in user_norm for w in ("paid", "don pay", "san owo", "ya biya", "akwula", "kwuru ugwo", "settle")):
-            m_amt = re.search(r'\b(\d[\d,]*k?)\b', user_norm)
-            amt = 0
-            if m_amt:
-                raw_amt = m_amt.group(1).replace(",", "")
-                amt = int(float(raw_amt[:-1]) * 1000) if raw_amt.endswith("k") else (int(raw_amt) if raw_amt.isdigit() else 0)
-
-            m_cust = re.search(r'([a-zA-Z\s]+?)\s+(?:paid|don pay|san|ya biya|kwuru|settle)', user_norm)
-            cust = m_cust.group(1).strip().title() if m_cust else "Customer"
-
-            return {
-                "language_detected": lang_detected,
-                "transactions": [{
-                    "intent": "payment_received",
-                    "customer": cust,
-                    "amount": amt,
-                }],
-            }
-
         # Expenses (buy fuel, expense, paid rent, inawo, kudin mai, mmanu)
         if any(w in user_norm for w in ("fuel", "diesel", "petrol", "expense", "rent", "generator", "transport", "food", "inawo", "kudin mai", "mmanu")):
             m_amt = re.search(r'\b(\d[\d,]*k?)\b', user_norm)
@@ -184,14 +164,46 @@ class MockLLM:
                 }],
             }
 
-        # Sales (sell / sold / sale / buy / bought / ta / sayar / erere / bags / to ...)
-        is_sale = any(w in user_norm for w in (
+        # Check whether this sentence contains sales or trade item words
+        is_sale_indicator = any(w in user_norm for w in (
             "sell", "sold", "sale", "buy", "bought", "ta ", "mo ta", "tita", "sayar", "sayarwa",
-            "erere", "ree", "give", "dash", "collect", "together", "na ", "zuba", "gbese", "bashi", "ugwo"
+            "erere", "ree", "give", "dash", "collect", "together", "na ", "zuba", "rice", "indomie",
+            "garri", "beans", "sugar", "cement", "milo", "yam", "provisions", "bread", "eggs", "meat",
+            "fish", "soap", "drinks", "flour", "biscuit", "spaghetti", "semovita", "milk", "groundnut",
+            "iresi", "shinkafa", "osikapa", "ewa", "wake", "agwa", "oil", "epo", "mai", "mmanu", "bag",
+            "carton", "crate", "piece", "buhu", "akpa", "apo"
         ))
+
+        # Standalone Customer Repayments (only if NOT part of a sale statement)
+        has_repay_word = any(w in user_norm for w in ("paid", "don pay", "san owo", "ya biya", "akwula", "kwuru ugwo", "settle"))
+        if has_repay_word and not is_sale_indicator:
+            m_amt = re.search(r'\b(\d[\d,]*k?)\b', user_norm)
+            amt = 0
+            if m_amt:
+                raw_amt = m_amt.group(1).replace(",", "")
+                amt = int(float(raw_amt[:-1]) * 1000) if raw_amt.endswith("k") else (int(raw_amt) if raw_amt.isdigit() else 0)
+
+            m_cust = re.search(r'([a-zA-Z\s]+?)\s+(?:paid|don pay|san|ya biya|kwuru|settle)', user_norm)
+            cust = "Customer"
+            if m_cust:
+                candidate = m_cust.group(1).strip().title()
+                stopwords = {"e", "he", "she", "im", "dem", "am", "today", "now", "yesterday", "i", "we", "they"}
+                if candidate.lower() not in stopwords and len(candidate) > 1:
+                    cust = candidate
+
+            return {
+                "language_detected": lang_detected,
+                "transactions": [{
+                    "intent": "payment_received",
+                    "customer": cust,
+                    "amount": amt,
+                }],
+            }
+
+        # Sales (sell / sold / sale / buy / bought / ta / sayar / erere / bags / to ...)
         all_num_matches = [int(n.replace(',', '')) for n in re.findall(r'\b\d+\b', user_norm)]
 
-        if is_sale or len(all_num_matches) > 0:
+        if is_sale_indicator or len(all_num_matches) > 0:
             # Look for quantity explicitly tied to a unit
             m_qty = re.search(r'\b(\d+)\s*(bag|buhu|buhunan|akpa|apo|carton|sachet|piece|unit|kg|crate|pack|bundle|paint|mudu|derica|cup)s?\b', user_norm)
             qty = 1
@@ -247,9 +259,9 @@ class MockLLM:
             cust = "Customer"
             if m_cust:
                 candidate = m_cust.group(1).strip()
-                # Exclude common tokens
-                stop_words = {"cash", "credit", "rice", "beans", "goods", "oil", "garri", "fuel", "carton", "bag"}
-                if candidate.lower() not in stop_words:
+                # Exclude common tokens and pronouns
+                stop_words = {"cash", "credit", "rice", "beans", "goods", "oil", "garri", "fuel", "carton", "bag", "e", "he", "she", "im", "dem", "am"}
+                if candidate.lower() not in stop_words and len(candidate) > 1:
                     cust = candidate.title()
 
             unit_price = int(total_amt / qty) if qty > 0 and total_amt > 0 else total_amt

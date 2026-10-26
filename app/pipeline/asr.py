@@ -49,7 +49,7 @@ class YarnGPTASR:
                     job_id = data.get("job_id")
                     if job_id:
                         status_headers = {"Authorization": f"Bearer {self.api_key}"}
-                        for _ in range(10):
+                        for _ in range(30):
                             time.sleep(1.5)
                             st_res = client.get(f"{self.base_url}/asr/{job_id}", headers=status_headers)
                             if st_res.status_code == 200:
