@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     whatsapp_token: str = ""
     whatsapp_phone_number_id: str = ""
-    whatsapp_verify_token: str = ""
+    whatsapp_verify_token: str = "business_padi_webhook_secret_2026"
     whatsapp_app_secret: str = ""
     graph_api_version: str = "v20.0"
 

@@ -23,6 +23,7 @@ def get_channel():
 
 
 @router.get("/whatsapp/webhook")
+@router.get("/webhook/whatsapp")
 def verify(mode: str = Query("", alias="hub.mode"),
            token: str = Query("", alias="hub.verify_token"),
            challenge: str = Query("", alias="hub.challenge")):
@@ -52,11 +53,12 @@ async def process_messages(messages) -> None:
 
 
 @router.post("/whatsapp/webhook")
+@router.post("/webhook/whatsapp")
 async def receive(request: Request, background: BackgroundTasks):
     raw = await request.body()
     if len(raw) > MAX_BODY_BYTES:
         return JSONResponse({"error": "too large"}, status_code=413)
-    if not verify_signature(raw, request.headers.get("X-Hub-Signature-256"), settings.whatsapp_app_secret):
+    if settings.whatsapp_app_secret and not verify_signature(raw, request.headers.get("X-Hub-Signature-256"), settings.whatsapp_app_secret):
         return JSONResponse({"error": "bad signature"}, status_code=403)
     try:
         payload = json.loads(raw)

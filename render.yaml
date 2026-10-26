@@ -21,6 +21,8 @@ services:
         value: "true"
       - key: DEMO_MODE
         value: "true"
+      - key: WHATSAPP_VERIFY_TOKEN
+        value: business_padi_webhook_secret_2026
     disk:
       name: data
       mountPath: /app/data
