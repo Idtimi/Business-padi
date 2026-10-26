@@ -9,6 +9,7 @@ from app.dashboard_routes import router as dashboard_router
 from app.db import Base, engine, SessionLocal
 from app.logging_conf import setup_logging
 from app.profile_routes import router as profile_router
+from app.telegram_routes import router as telegram_router
 from app.twilio_routes import router as twilio_router
 from app.whatsapp_routes import router as whatsapp_router
 import app.models as m
@@ -84,6 +85,19 @@ async def lifespan(app: FastAPI):
                         updated = True
                     if updated:
                         db.commit()
+
+            # Automatically register Telegram webhook if configured
+            try:
+                tg_token = getattr(settings, "telegram_bot_token", None)
+                if tg_token and settings.base_url:
+                    import httpx
+                    target_url = f"{settings.base_url.rstrip('/')}/webhook/telegram"
+                    reg_url = f"https://api.telegram.org/bot{tg_token}/setWebhook?url={target_url}"
+                    with httpx.Client(timeout=10.0) as client:
+                        reg_res = client.get(reg_url)
+                        log.info("Telegram setWebhook (%s): %s", target_url, reg_res.text)
+            except Exception as e:
+                log.warning("Could not auto-register Telegram webhook: %s", e)
         except Exception as e:
             log.exception("Automatic schema / demo initialization error: %s", str(e))
     yield
@@ -92,6 +106,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Business Padi", lifespan=lifespan)
 app.include_router(whatsapp_router)
 app.include_router(twilio_router)
+app.include_router(telegram_router)
 app.include_router(dashboard_router, prefix="/d")
 app.include_router(profile_router)
 

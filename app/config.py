@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     tts_provider: str = "yarngpt"
     yarngpt_api_key: str = "sk_live_10ypR9T5hMJkcyCK.auXXCXsSJjMSN7RUjsqjTSHULCFs56OtrEZVgegBOwQ"
+    telegram_bot_token: str = "8385879089:AAGbfSdub46z9c7JwfeMtLhUC6I7zEzJ-Ik"
 
     languages_enabled: str = "pcm,en,yo,ha,ig"
     asr_provider_by_lang: str = ""
