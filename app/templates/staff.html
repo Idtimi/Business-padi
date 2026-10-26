@@ -12,13 +12,13 @@
 
 {% if message %}
 <div class="card" style="background: #ecfdf5; border-color: #a7f3d0; color: #065f46; margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
-    ✅ <strong>{{ message }}</strong>
+    &bull; <strong>{{ message }}</strong>
 </div>
 {% endif %}
 
 {% if error %}
 <div class="card" style="background: #fef2f2; border-color: #fecaca; color: #991b1b; margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
-    ⚠️ <strong>{{ error }}</strong>
+    <strong>{{ error }}</strong>
 </div>
 {% endif %}
 
@@ -27,7 +27,7 @@
     <!-- Form 1: Add Staff Member Directly -->
     <div class="card" style="margin-bottom: 0;">
         <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--primary); margin-bottom: 0.5rem;">
-            ➕ Add Staff Member Directly
+            Add Staff Member Directly
         </h2>
         <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
             Directly register an attendant or manager into your shop team.
@@ -71,7 +71,7 @@
     <!-- Form 2: Generate One-Time Invite Code -->
     <div class="card" style="margin-bottom: 0;">
         <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
-            🎟️ Generate WhatsApp Invite Code
+            Generate WhatsApp Invite Code
         </h2>
         <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
             Create a one-time 24-hour code (e.g. <code>JOIN-XXXX</code>) that your staff can text to Business Padi.
@@ -199,7 +199,7 @@
                                    target="_blank" 
                                    class="btn btn-outline btn-sm" 
                                    style="color: var(--primary); margin-right: 0.5rem;">
-                                   📱 Send via WhatsApp
+                                    Send via WhatsApp
                                 </a>
                                 <form action="/d/invites/{{ inv.id }}/delete" method="POST" style="display: inline;">
                                     <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger);">Cancel</button>

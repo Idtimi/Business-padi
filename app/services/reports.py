@@ -417,7 +417,7 @@ def generate_summary(session: Session, business_id: int, period: str = "today",
     low_stock = stock.get_low_stock_items(session, business_id)
 
     period_title = "Today" if period == "today" else ("This Week" if period in ("week", "this_week") else period.title())
-    lines = [f"📊 *Summary for {period_title}*"]
+    lines = [f" *Summary for {period_title}*"]
     lines.append(f"• Sales: {sales['total_naira']} ({sales['count']} sales)")
     if exp["total_kobo"] > 0:
         cat_str = ", ".join(f"{c['category']}: {c['total_naira']}" for c in exp["categories"][:3])
@@ -436,10 +436,10 @@ def generate_summary(session: Session, business_id: int, period: str = "today",
 
     if low_stock:
         low_names = ", ".join(f"{it.name} ({it.qty:g})" for it in low_stock[:3])
-        lines.append(f"⚠️ *Low stock*: {low_names}")
+        lines.append(f"️ *Low stock*: {low_names}")
 
     if nudges:
-        lines.append("\n💡 *Nudges*:")
+        lines.append("\n *Nudges*:")
         for n in nudges[:3]:
             lines.append(f"• {n}")
 

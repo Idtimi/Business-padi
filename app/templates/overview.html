@@ -7,7 +7,7 @@
 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
     <div>
         <h1 style="font-size: 1.65rem; font-weight: 800; color: var(--padi-navy); letter-spacing: -0.02em;">
-            Welcome back, {{ user.display_name or "Shop Owner" }}! 👋
+            Welcome back, {{ user.display_name or "Shop Owner" }}! 
         </h1>
         <p style="color: var(--text-muted); font-size: 0.95rem;">
             Here is your live shop summary for today &bull; <strong>{{ metrics.date_str }}</strong>
@@ -15,10 +15,10 @@
     </div>
     <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
         <a href="/d/ledger/export.csv" class="btn btn-outline">
-            📥 Export CSV
+            Export CSV
         </a>
         <a href="/d/reports/pnl.pdf" class="btn btn-navy" target="_blank">
-            📊 Download P&L Report
+            Download P&L Report
         </a>
         <a href="/d/ledger" class="btn btn-primary">
             View Full Ledger &rarr;
@@ -29,7 +29,7 @@
 {% if request.query_params.get('welcome') %}
 <div class="card" style="background: var(--padi-cream); border: 2px solid #FED7AA; margin-bottom: 1.5rem; padding: 1.25rem 1.5rem;">
     <div style="display: flex; align-items: center; gap: 0.85rem;">
-        <span style="font-size: 2rem;">🎉</span>
+        <span style="font-size: 2rem;"></span>
         <div>
             <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--padi-deep-orange);">Welcome to Business Padi!</h3>
             <p style="font-size: 0.9rem; color: #5A6B87; margin-top: 0.2rem;">
@@ -44,15 +44,15 @@
 <div class="card" style="padding: 1rem 1.25rem; margin-bottom: 1.75rem; background: #FFFFFF; border-left: 4px solid var(--padi-orange);">
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
         <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <span style="font-size: 1.25rem;">⚡</span>
+            <span style="font-size: 1.25rem;"></span>
             <span style="font-weight: 700; color: var(--padi-navy); font-size: 0.92rem;">Quick Operations:</span>
         </div>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-            <a href="/d/documents" class="btn btn-outline btn-sm">📄 View Receipts & Invoices</a>
-            <a href="/d/customers" class="btn btn-outline btn-sm">👥 Debtor Statements</a>
-            <a href="/d/stock" class="btn btn-outline btn-sm">📦 Check Stock Balances</a>
-            <a href="/d/staff" class="btn btn-outline btn-sm">🎟️ Staff & Invites</a>
-            <a href="/d/billing" class="btn btn-outline btn-sm" style="border-color: var(--padi-orange); color: var(--padi-deep-orange);">⭐ Plans & Tiers</a>
+            <a href="/d/documents" class="btn btn-outline btn-sm">View Receipts & Invoices</a>
+            <a href="/d/customers" class="btn btn-outline btn-sm">Debtor Statements</a>
+            <a href="/d/stock" class="btn btn-outline btn-sm">Check Stock Balances</a>
+            <a href="/d/staff" class="btn btn-outline btn-sm">Staff & Invites</a>
+            <a href="/d/billing" class="btn btn-outline btn-sm" style="border-color: var(--padi-orange); color: var(--padi-deep-orange);">Plans & Tiers</a>
         </div>
     </div>
 </div>
@@ -139,9 +139,9 @@
                         </td>
                         <td>
                             {% if tx.status == 'confirmed' %}
-                                <span class="badge badge-success">✓ Confirmed</span>
+                                <span class="badge badge-success"> Confirmed</span>
                             {% elif tx.status == 'pending' %}
-                                <span class="badge badge-warning">⏳ Pending Approval</span>
+                                <span class="badge badge-warning"> Pending Approval</span>
                             {% else %}
                                 <span class="badge badge-danger">{{ tx.status }}</span>
                             {% endif %}

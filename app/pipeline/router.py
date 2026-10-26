@@ -329,7 +329,7 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         days_col = p_data["average_days_to_collect"]
         debt = p_data["debt_concentration"]
         msg_profile = (
-            f"📊 *Verified Financial Trade Profile*\n"
+            f" *Verified Financial Trade Profile*\n"
             f"Merchant: {p_data['business_name']}\n"
             f"• Record History: {mat['weeks']} weeks ({mat['days']} days)\n"
             f"• Active Days: {act['percentage']}%\n"

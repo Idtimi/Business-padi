@@ -37,7 +37,7 @@
 <body>
     <div class="container">
         <div class="notice-banner">
-            🛡️ <strong>Verified Trade Profile</strong> &bull; Authorized by merchant via explicit consent for partner <strong>{{ consent.partner }}</strong>.
+            <strong>Verified Trade Profile</strong> &bull; Authorized by merchant via explicit consent for partner <strong>{{ consent.partner }}</strong>.
             This document represents verified bookkeeping history and is <strong>not a credit score</strong>.
         </div>
 
@@ -48,7 +48,7 @@
                 <p style="color: var(--text-muted); font-size: 0.85rem;">As of {{ profile.as_of_date }} &bull; Scope: {{ consent.scope }}</p>
             </div>
             <div>
-                <a href="/profile/shared/{{ token }}/pdf" class="btn">📄 Download PDF Profile</a>
+                <a href="/profile/shared/{{ token }}/pdf" class="btn">Download PDF Profile</a>
             </div>
         </div>
 

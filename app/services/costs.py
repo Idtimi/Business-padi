@@ -92,9 +92,9 @@ def generate_cost_report_text(session: Session, today: date | None = None) -> st
     month_data = data["month"]
 
     lines = [
-        "📊 *WhatsApp Message Cost Report*",
+        " *WhatsApp Message Cost Report*",
         "-----------------------------",
-        f"📅 *Today ({data['date']}):*",
+        f" *Today ({data['date']}):*",
         f"Total Sent: {today_data['total_count']} messages",
         f"Estimated Cost: {fmt_naira(today_data['total_kobo'])} ({today_data['total_kobo']:,} kobo)",
         "",
@@ -118,7 +118,7 @@ def generate_cost_report_text(session: Session, today: date | None = None) -> st
 
     lines.append("")
     lines.append("-----------------------------")
-    lines.append(f"🗓️ *This Month ({data['date'][:7]}):*")
+    lines.append(f"️ *This Month ({data['date'][:7]}):*")
     lines.append(f"Total Sent: {month_data['total_count']} messages")
     lines.append(f"Estimated Cost: {fmt_naira(month_data['total_kobo'])} ({month_data['total_kobo']:,} kobo)")
     lines.append("")
