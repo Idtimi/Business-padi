@@ -566,6 +566,12 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return handle_button(session, business_id, user_id, "get_receipt", lang=lang)
 
+    # Direct invoice command
+    if lower in ("/invoice", "invoice", "/send_invoice", "send invoice", "/invoices", "invoices") and biz:
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        return handle_button(session, business_id, user_id, "get_invoice", lang=lang)
+
     # Debtors query command
     if lower in ("/debtors", "debtors", "/debts", "debts", "/debt", "debt") and biz:
         from app.services import reports
@@ -887,6 +893,114 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
             ))
         return replies
 
+    if action == "send_invoice" or action.startswith("get_invoice"):
+        tx = None
+        doc = None
+        if action.startswith("get_invoice_tx:"):
+            try:
+                tx_id = int(action.split(":", 1)[1])
+                tx = session.get(Transaction, tx_id)
+            except ValueError:
+                pass
+        elif action.startswith("get_invoice:"):
+            try:
+                doc_id = int(action.split(":", 1)[1])
+                doc = session.get(Document, doc_id)
+            except ValueError:
+                pass
+
+        if doc is None and tx is not None:
+            doc = session.scalar(
+                select(Document).where(
+                    Document.business_id == business_id,
+                    Document.transaction_id == tx.id,
+                    Document.kind == "invoice",
+                    Document.status == "issued",
+                )
+            )
+            if doc is None:
+                doc = documents.issue_document(
+                    session=session,
+                    business_id=business_id,
+                    kind="invoice",
+                    transaction_id=tx.id,
+                    customer_id=tx.customer_id,
+                    items=tx.items_json or [],
+                    total_kobo=tx.total_kobo,
+                    paid_kobo=tx.paid_kobo,
+                )
+
+        if doc is None:
+            doc = session.scalar(
+                select(Document).where(
+                    Document.business_id == business_id,
+                    Document.kind == "invoice",
+                    Document.status == "issued",
+                ).order_by(Document.id.desc())
+            )
+
+        if doc is None:
+            tx = ledger.get_last_transaction(session, business_id)
+            if tx:
+                doc = documents.issue_document(
+                    session=session,
+                    business_id=business_id,
+                    kind="invoice",
+                    transaction_id=tx.id,
+                    customer_id=tx.customer_id,
+                    items=tx.items_json or [],
+                    total_kobo=tx.total_kobo,
+                    paid_kobo=tx.paid_kobo,
+                )
+
+        if doc is None:
+            return [Reply(
+                "No invoice found yet.\n\n"
+                "To create a new invoice, type e.g.:\n"
+                "Invoice 5 bags of rice for 200,000 for Mr Bolu\n"
+                "or manage invoices on your dashboard: /dashboard"
+            )]
+
+        download_url = f"{settings.base_url.rstrip('/')}/d/invoice/{doc.number}"
+        cust = session.get(Customer, doc.customer_id) if doc.customer_id else None
+        cust_name = cust.name if cust else "customer"
+        biz = session.get(Business, business_id)
+
+        user = session.get(User, user_id)
+        if user:
+            st = dict(user.state_data or {})
+            st["pending_receipt_doc_id"] = doc.id
+            st["pending_receipt_cust_id"] = doc.customer_id
+            user.state_data = st
+            session.commit()
+
+        replies = [
+            Reply(
+                text=f"Invoice #{doc.number} issued ({fmt_naira(doc.total_kobo)})\nDownload PDF: {download_url}",
+                document_path=doc.file_path,
+                document_filename=f"{doc.number}.pdf",
+            ),
+        ]
+        if cust and cust.phone:
+            wa_msg = f"Hello {cust.name}, here is your invoice #{doc.number} from {biz.name if biz else 'Shop'} for {fmt_naira(doc.total_kobo)}: {download_url}"
+            wa_link = documents.wa_me_link(cust.phone, wa_msg)
+            replies.append(Reply(
+                text=(
+                    f"Forward invoice to {cust.name} on WhatsApp:\n{wa_link}\n\n"
+                    f"To send to a different number, reply with customer's phone number, or tap [Done]."
+                ),
+                buttons=[(f"skip_receipt:{doc.id}", "Done")],
+            ))
+        else:
+            replies.append(Reply(
+                text=(
+                    f"Send invoice to {cust_name} on WhatsApp?\n"
+                    f"Reply with customer's phone number (e.g. 08012345678) or tap [Skip]."
+                ),
+                buttons=[(f"skip_receipt:{doc.id}", "Skip")],
+            ))
+        return replies
+
     if action.startswith("skip_receipt"):
         user = session.get(User, user_id)
         if user:
@@ -895,7 +1009,7 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
             st.pop("pending_receipt_cust_id", None)
             user.state_data = st
             session.commit()
-        return [Reply("Receipt ready. You can record another sale or type /dashboard.")]
+        return [Reply("Ready. You can record another transaction or type /dashboard.")]
 
     try:
         p = pending.get_for_business(session, business_id, pending_id)
@@ -916,13 +1030,30 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
                 p.status = "applied"
                 session.commit()
                 cust = session.get(Customer, data.get("customer_id")) if data.get("customer_id") else None
+                cust_name = cust.name if cust else "customer"
                 biz = session.get(Business, business_id)
-                link = documents.wa_me_link(
-                    cust.phone if cust else None,
-                    f"Here is your {doc.kind} #{doc.number} from {biz.name if biz else 'Shop'}: {fmt_naira(doc.total_kobo)}"
+                download_url = f"{settings.base_url.rstrip('/')}/d/{doc.kind}/{doc.number}"
+
+                user = session.get(User, user_id)
+                if user:
+                    st = dict(user.state_data or {})
+                    st["pending_receipt_doc_id"] = doc.id
+                    st["pending_receipt_cust_id"] = data.get("customer_id")
+                    user.state_data = st
+                    session.commit()
+
+                wa_msg = f"Here is your {doc.kind} #{doc.number} from {biz.name if biz else 'Shop'}: {fmt_naira(doc.total_kobo)} {download_url}"
+                link = documents.wa_me_link(cust.phone if cust else None, wa_msg)
+                msg_text = (
+                    f"{doc.kind.title()} #{doc.number} issued ({fmt_naira(doc.total_kobo)}).\n"
+                    f"Download PDF: {download_url}\n"
+                    f"Forward link: {link}"
                 )
-                msg_text = f"{doc.kind.title()} #{doc.number} issued ({fmt_naira(doc.total_kobo)}).\nForward link: {link}"
-                return [Reply(msg_text)]
+                return [Reply(
+                    text=msg_text,
+                    document_path=doc.file_path,
+                    document_filename=f"{doc.number}.pdf",
+                )]
             if p.kind == "correction":
                 tx = ledger.confirm_correction(session, business_id, pending_id)
                 return [Reply(_saved_text(session, business_id, tx, lang))]
@@ -931,6 +1062,8 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
             buttons = []
             if tx.kind == "sale":
                 buttons.append((f"get_receipt:{tx.id}", "Download Receipt"))
+                if tx.total_kobo > tx.paid_kobo:
+                    buttons.append((f"get_invoice_tx:{tx.id}", "Download Invoice"))
             return [Reply(saved_msg, buttons=buttons)]
         if action == "cancel":
             pending.cancel(session, business_id, pending_id)

@@ -125,11 +125,15 @@ def login_page(request: Request, token: str | None = None, error: str | None = N
 
 @router.get("/receipt/{doc_number}")
 @router.get("/receipt/{doc_number}.pdf")
+@router.get("/invoice/{doc_number}")
+@router.get("/invoice/{doc_number}.pdf")
+@router.get("/document/{doc_number}")
+@router.get("/document/{doc_number}.pdf")
 def public_download_receipt(doc_number: str, db: Session = Depends(get_db)):
     clean_no = doc_number.upper().replace(".PDF", "").strip()
     doc = db.scalar(select(Document).where(Document.number == clean_no))
     if doc is None or doc.status == "cancelled":
-        raise HTTPException(status_code=404, detail="Receipt not found.")
+        raise HTTPException(status_code=404, detail="Document not found.")
 
     if doc.file_path and os.path.exists(doc.file_path):
         return FileResponse(
@@ -142,9 +146,10 @@ def public_download_receipt(doc_number: str, db: Session = Depends(get_db)):
     biz = db.get(Business, doc.business_id)
     cust = db.get(Customer, doc.customer_id) if doc.customer_id else None
     tx = db.get(Transaction, doc.transaction_id) if doc.transaction_id else None
-    items = tx.items_json if tx and tx.items_json else [{"name": "Goods", "qty": 1, "unit": "unit", "line_total_kobo": doc.total_kobo}]
-    paid = tx.paid_kobo if tx else doc.total_kobo
-    bal = max(0, doc.total_kobo - paid)
+    items = tx.items_json if tx and tx.items_json else [{"name": "Order items", "qty": 1, "unit": "unit", "line_total_kobo": doc.total_kobo}]
+    paid = tx.paid_kobo if tx else (0 if doc.kind == "invoice" else doc.total_kobo)
+    bal = max(0, (doc.total_kobo or 0) - paid)
+    doc_kind = doc.kind.title() if doc.kind else "Invoice"
     pdf_bytes = documents.render_pdf_bytes(
         business_name=biz.name if biz else "Business Padi Shop",
         business_address=biz.address if biz else None,
@@ -153,13 +158,13 @@ def public_download_receipt(doc_number: str, db: Session = Depends(get_db)):
         business_footer=getattr(biz, "footer_note", None),
         brand_color=getattr(biz, "brand_color", None),
         logo_path=getattr(biz, "logo_path", None),
-        doc_kind="Receipt",
+        doc_kind=doc_kind,
         doc_number=doc.number,
         doc_date=doc.created_at[:10] if doc.created_at else "Today",
         customer_name=cust.name if cust else None,
         customer_phone=cust.phone if cust else None,
         items=items,
-        total_kobo=doc.total_kobo,
+        total_kobo=doc.total_kobo or 0,
         paid_kobo=paid,
         balance_kobo=bal,
     )
