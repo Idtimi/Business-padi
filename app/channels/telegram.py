@@ -128,6 +128,8 @@ class TelegramChannel:
 
     async def download_media(self, media_ref: str) -> tuple[bytes, str]:
         """Download voice note or media using Telegram file_id or direct URL."""
+        if not media_ref:
+            raise ValueError("No media_ref provided for Telegram download")
         if media_ref.startswith("http://") or media_ref.startswith("https://"):
             resp = await self._client.get(media_ref, follow_redirects=True)
             resp.raise_for_status()
@@ -139,6 +141,9 @@ class TelegramChannel:
         res = await self._client.get(get_file_url)
         res.raise_for_status()
         file_data = res.json()
+        if not file_data.get("ok"):
+            desc = file_data.get("description", "Unknown Telegram getFile error")
+            raise ValueError(f"Telegram getFile error: {desc}")
         file_path = file_data.get("result", {}).get("file_path")
         if not file_path:
             raise ValueError(f"Could not retrieve file_path for Telegram file_id {media_ref}")

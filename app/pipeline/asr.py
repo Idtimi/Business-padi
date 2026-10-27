@@ -41,7 +41,18 @@ class YarnGPTASR:
                 "Authorization": f"Bearer {self.api_key}",
                 "Idempotency-Key": str(uuid.uuid4()),
             }
-            files = {"file": (p.name, audio_bytes, "audio/wav")}
+            ext = p.suffix.lower()
+            mime_map = {
+                ".ogg": "audio/ogg",
+                ".oga": "audio/ogg",
+                ".opus": "audio/ogg",
+                ".mp3": "audio/mpeg",
+                ".wav": "audio/wav",
+                ".m4a": "audio/mp4",
+                ".mp4": "audio/mp4",
+            }
+            mime_type = mime_map.get(ext, "audio/wav")
+            files = {"file": (p.name, audio_bytes, mime_type)}
             with httpx.Client(timeout=30.0) as client:
                 resp = client.post(f"{self.base_url}/asr", headers=headers, files=files)
                 if resp.status_code == 202:
@@ -86,7 +97,18 @@ class WhisperASR:
         p = Path(wav_path)
         try:
             with open(p, "rb") as audio_file:
-                files = {"file": (p.name, audio_file, "audio/wav")}
+                ext = p.suffix.lower()
+                mime_map = {
+                    ".ogg": "audio/ogg",
+                    ".oga": "audio/ogg",
+                    ".opus": "audio/ogg",
+                    ".mp3": "audio/mpeg",
+                    ".wav": "audio/wav",
+                    ".m4a": "audio/mp4",
+                    ".mp4": "audio/mp4",
+                }
+                mime_type = mime_map.get(ext, "audio/wav")
+                files = {"file": (p.name, audio_file, mime_type)}
                 data = {"model": self.model}
                 if language_hint and language_hint in ("en", "yo", "ha", "ig"):
                     data["language"] = language_hint

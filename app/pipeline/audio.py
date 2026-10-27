@@ -23,15 +23,19 @@ class AudioConversionError(Exception):
     """ffmpeg failed or is not installed."""
 
 
-def _find_ffmpeg() -> str:
-    """Return the path to ffmpeg, or raise AudioConversionError."""
+def _find_ffmpeg() -> str | None:
+    """Return the path to ffmpeg, or None if unavailable."""
     path = shutil.which("ffmpeg")
-    if path is None:
-        raise AudioConversionError(
-            "ffmpeg is not installed or not on PATH. "
-            "Install it to process voice notes."
-        )
-    return path
+    if path:
+        return path
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe:
+            return exe
+    except Exception:
+        pass
+    return None
 
 
 def probe_duration(file_path: str) -> float:
@@ -56,9 +60,12 @@ def probe_duration(file_path: str) -> float:
         return 0.0
 
 
-def convert_to_wav(input_path: str, output_path: str) -> None:
-    """Convert any audio file to 16 kHz mono WAV using ffmpeg."""
+def convert_to_wav(input_path: str, output_path: str) -> bool:
+    """Convert any audio file to 16 kHz mono WAV using ffmpeg. Returns True if converted."""
     ffmpeg = _find_ffmpeg()
+    if not ffmpeg:
+        log.warning("No ffmpeg executable found; proceeding with original audio format")
+        return False
     cmd = [
         ffmpeg, "-y",            # overwrite output
         "-i", input_path,
@@ -69,37 +76,37 @@ def convert_to_wav(input_path: str, output_path: str) -> None:
     ]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-    except subprocess.TimeoutExpired as exc:
-        raise AudioConversionError(f"ffmpeg timed out converting {input_path}") from exc
-    if proc.returncode != 0:
-        raise AudioConversionError(f"ffmpeg exited {proc.returncode}: {proc.stderr[:500]}")
+        if proc.returncode == 0:
+            return True
+        log.warning("ffmpeg conversion exited %s: %s", proc.returncode, proc.stderr[:300])
+        return False
+    except Exception as exc:
+        log.warning("ffmpeg conversion failed for %s: %s", input_path, exc)
+        return False
 
 
 async def download_and_convert(channel, media_ref: str) -> tuple[str, Path]:
-    """Download a voice note and convert it to WAV.
+    """Download a voice note and convert it to WAV if ffmpeg is available.
 
-    Returns (transcript_wav_path, temp_dir).
+    Returns (transcript_audio_path, temp_dir).
     The caller MUST delete temp_dir when done.
 
     Raises AudioTooLong if the note exceeds settings.max_voice_seconds.
-    Raises AudioConversionError if ffmpeg is missing or fails.
     """
-    content, content_type = await channel.download_media(media_ref)
-
-    # Pick a sensible extension from the MIME type
-    ext = ".ogg"
-    if "mpeg" in content_type:
-        ext = ".mp3"
-    elif "wav" in content_type:
-        ext = ".wav"
-    elif "mp4" in content_type or "m4a" in content_type:
-        ext = ".m4a"
-
     tmp_dir = Path(tempfile.mkdtemp(prefix="vl_voice_"))
-    raw_path = tmp_dir / f"raw{ext}"
-    wav_path = tmp_dir / "voice.wav"
-
     try:
+        content, content_type = await channel.download_media(media_ref)
+
+        # Pick a sensible extension from the MIME type
+        ext = ".ogg"
+        if "mpeg" in content_type:
+            ext = ".mp3"
+        elif "wav" in content_type:
+            ext = ".wav"
+        elif "mp4" in content_type or "m4a" in content_type:
+            ext = ".m4a"
+
+        raw_path = tmp_dir / f"raw{ext}"
         raw_path.write_bytes(content)
 
         # Duration check BEFORE the expensive conversion
@@ -109,13 +116,17 @@ async def download_and_convert(channel, media_ref: str) -> tuple[str, Path]:
                 f"Voice note is {duration:.0f}s, max is {settings.max_voice_seconds}s"
             )
 
-        # If the input is already a WAV, skip conversion
+        # If the input is already a WAV, return directly
         if ext == ".wav":
-            wav_path = raw_path
-        else:
-            convert_to_wav(str(raw_path), str(wav_path))
+            return str(raw_path), tmp_dir
 
-        return str(wav_path), tmp_dir
+        wav_path = tmp_dir / "voice.wav"
+        converted = convert_to_wav(str(raw_path), str(wav_path))
+        if converted and wav_path.exists():
+            return str(wav_path), tmp_dir
+
+        # Fallback to the raw audio file so Whisper can transcribe it directly
+        return str(raw_path), tmp_dir
     except Exception:
         # Clean up on any error
         shutil.rmtree(tmp_dir, ignore_errors=True)

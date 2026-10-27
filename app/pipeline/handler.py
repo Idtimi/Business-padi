@@ -100,6 +100,9 @@ async def _handle_voice(channel: Channel, session: Session, biz: Business | None
     except AudioConversionError:
         log.exception("audio conversion failed for message %s", msg.message_id)
         return [router.Reply(t(user.language, "try_again"))]
+    except Exception as e:
+        log.exception("Unexpected error processing voice note for message %s: %s", msg.message_id, e)
+        return [router.Reply("I could not process your voice note. Please speak clearly again or type your entry.")]
     finally:
         if tmp_dir is not None:
             shutil.rmtree(tmp_dir, ignore_errors=True)

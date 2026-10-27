@@ -42,3 +42,4 @@ websockets==17.3
 python-multipart==0.0.32
 psycopg2-binary>=2.9.9
 psycopg[binary]>=3.1.18
+imageio-ffmpeg>=0.5.1

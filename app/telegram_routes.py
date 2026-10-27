@@ -171,5 +171,9 @@ async def receive_telegram_webhook(request: Request):
                 )
             except Exception:
                 pass
+        finally:
+            await channel.aclose()
+    else:
+        await channel.aclose()
 
     return JSONResponse({"status": "ok"}, status_code=200)

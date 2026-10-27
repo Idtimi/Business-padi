@@ -86,21 +86,6 @@ async def lifespan(app: FastAPI):
                     if updated:
                         db.commit()
 
-            # Clean up temporary businesses created during earlier testing phases
-            hardcoded_phones = {"2348011223344", "+2348164802550", "2348164802550"}
-            hardcoded_names = {"Mama Ngozi Provisions", "Business Padi Store"}
-            test_bizs = db.query(m.Business).filter(~m.Business.name.in_(hardcoded_names)).all()
-            for tb in test_bizs:
-                owner = db.get(m.User, tb.owner_user_id) if tb.owner_user_id else None
-                if owner and owner.channel_user_id in hardcoded_phones:
-                    continue
-                m.delete_business_cascade(db, tb.id)
-                if owner and owner.channel_user_id not in hardcoded_phones:
-                    owner.state = "NEW"
-                    owner.consent_at = None
-                    owner.state_data = {}
-                    db.commit()
-
             # Automatically register Telegram webhook if configured
             try:
                 tg_token = getattr(settings, "telegram_bot_token", None)
