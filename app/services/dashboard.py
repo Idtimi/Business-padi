@@ -105,16 +105,16 @@ def verify_magic_token(session: Session, raw_token: str) -> tuple[bool, str, Pen
                 if now > exp_dt:
                     matched_action.status = "expired"
                     session.commit()
-                    return False, "This login link has expired. Please request a new one.", None
+                    return False, "This login link has expired. Please request a new one with /dashboard.", None
             except Exception:
                 log.exception("Error checking token expiration")
 
-        # Mark as applied
+        # Mark as applied so token is single-use
         matched_action.status = "applied"
         session.commit()
         return True, "OK", matched_action
 
-    # 2. Stateless cryptographic verification fallback (if DB was reset/wiped by deploy)
+    # 2. Stateless cryptographic verification fallback (if DB record not yet written or synced)
     if "_" in clean_t:
         parts = clean_t.split("_")
         if len(parts) == 4:
@@ -139,25 +139,7 @@ def verify_magic_token(session: Session, raw_token: str) -> tuple[bool, str, Pen
             except Exception:
                 log.exception("Error decoding stateless magic token")
 
-    return False, "Invalid or already used login token.", None
-
-    # Check expiry
-    if matched_action.expires_at:
-        try:
-            exp_dt = datetime.fromisoformat(matched_action.expires_at)
-            if exp_dt.tzinfo is None:
-                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
-            if now > exp_dt:
-                matched_action.status = "expired"
-                session.commit()
-                return False, "This login link has expired. Please request a new one via WhatsApp.", None
-        except Exception:
-            log.exception("Error checking token expiration")
-
-    # Mark as applied
-    matched_action.status = "applied"
-    session.commit()
+    return False, "Invalid login link. Please request a new link with /dashboard.", None
     return True, "OK", matched_action
 
 
