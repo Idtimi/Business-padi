@@ -184,6 +184,43 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         await _send_all(channel, session, biz, msg.user_ref, [router.Reply(reply_text)])
         return
 
+    # Check for staff invite / join code upfront (e.g. "JOIN-123456", "/start JOIN-123456", "/join JOIN-123456")
+    join_code = None
+    if msg.kind == "text":
+        parts = text.strip().split()
+        if len(parts) >= 2 and parts[0].upper() in ("/START", "START", "/JOIN", "JOIN"):
+            candidate = parts[1].strip().upper().replace("_", "-")
+            if candidate.startswith("JOIN-") or candidate.isdigit() or len(candidate) == 6:
+                join_code = candidate if candidate.startswith("JOIN-") else f"JOIN-{candidate}"
+        elif len(parts) == 1:
+            candidate = parts[0].strip().upper().replace("_", "-")
+            if candidate.startswith("JOIN-") or candidate.startswith("/JOIN-"):
+                join_code = candidate.lstrip("/")
+        elif len(parts) == 2 and parts[0].upper() == "JOIN":
+            candidate = parts[1].strip().upper()
+            join_code = f"JOIN-{candidate}" if not candidate.startswith("JOIN-") else candidate
+
+    if join_code:
+        from app.services import staff
+        ok, reply_msg, st_rec = staff.join_business_with_code(session, user.id, join_code)
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        if ok and st_rec:
+            user.state = "DONE"
+            session.commit()
+            biz = session.get(Business, st_rec.business_id)
+            welcome_text = (
+                f"{reply_msg}\n\n"
+                f"You are now registered as an attendant for {biz.name if biz else 'the shop'}.\n\n"
+                f"You can record transactions for the shop anytime by voice note or text (e.g. 'Sold 2 bags rice for 90,000').\n\n"
+                f"Type /commands to see available staff actions."
+            )
+            await _send_all(channel, session, biz, msg.user_ref, [router.Reply(welcome_text)])
+            return
+        else:
+            await _send_all(channel, session, biz, msg.user_ref, [router.Reply(reply_msg)])
+            return
+
     # Check for account / shop deletion and reset commands
     if msg.kind == "text" and t_upper in (
         "/RESET", "RESET", "/RESET_SHOP", "RESET SHOP",

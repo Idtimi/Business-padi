@@ -191,11 +191,41 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
     if text.lower() == "help":
         return [Reply(help_menu(user.language))]
 
+    # Check for staff join code at any point in onboarding
+    clean_upper = text.strip().upper().replace("_", "-")
+    candidate_code = None
+    if clean_upper.startswith("JOIN-"):
+        candidate_code = clean_upper.split()[0]
+    elif clean_upper.startswith("/START JOIN-"):
+        candidate_code = clean_upper.split()[1]
+    elif clean_upper.startswith("JOIN ") and len(clean_upper.split()) == 2:
+        candidate_code = f"JOIN-{clean_upper.split()[1]}"
+
+    if candidate_code:
+        from app.services import staff
+        ok, reply_msg, st_rec = staff.join_business_with_code(session, user.id, candidate_code)
+        if ok and st_rec:
+            user.state = "DONE"
+            session.commit()
+            biz = session.get(Business, st_rec.business_id)
+            welcome_text = (
+                f"{reply_msg}\n\n"
+                f"You are now registered as an attendant for {biz.name if biz else 'the shop'}.\n\n"
+                f"You can record transactions for the shop anytime by voice note or text (e.g. 'Sold 2 bags rice for 90,000').\n\n"
+                f"Type /commands to see available staff actions."
+            )
+            return [Reply(welcome_text)]
+        else:
+            return [Reply(reply_msg)]
+
     # State: NEW
     if user.state == "NEW":
         user.state = "CHOOSE_LANGUAGE"
         session.commit()
-        welcome = "Welcome to Business Padi. Choose your language:"
+        welcome = (
+            "Welcome to Business Padi!\n\n"
+            "Choose your language to set up your shop, or if you were invited by your shop owner, enter your invite code (e.g. JOIN-123456):"
+        )
         buttons = [
             ("lang:en", "English"),
             ("lang:pcm", "Nigerian Pidgin"),

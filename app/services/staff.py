@@ -199,6 +199,16 @@ def join_business_with_code(session: Session, user_id: int, code: str) -> tuple[
     return True, f"Welcome! You have joined *{biz.name or 'the shop'}* as {inv.role}.", staff
 
 
+def list_staff(session: Session, business_id: int) -> list[Staff]:
+    """Return all active staff members for a business."""
+    return list(session.scalars(
+        select(Staff).where(
+            Staff.business_id == business_id,
+            Staff.active == 1,
+        )
+    ).all())
+
+
 def remove_staff_member(session: Session, business_id: int, staff_user_id: int, actor_user_id: int) -> bool:
     """Owner revokes staff access immediately."""
     if not is_owner(session, business_id, actor_user_id):

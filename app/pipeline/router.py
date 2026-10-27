@@ -326,13 +326,13 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         try:
             inv = staff.create_invite(session, business_id, user_id, role="attendant")
+            tg_bot = getattr(settings, "telegram_bot_username", "Business_padi_bot").lstrip("@")
+            join_link = f"https://t.me/{tg_bot}?start={inv.code}"
             msg = (
                 f"Staff invite created!\n\n"
                 f"Invite Code: *{inv.code}*\n"
-                f"Expires in 24 hours.\n\n"
-                f"Share this code with your shop attendant. When they message this bot and send:\n"
-                f"*{inv.code}*\n"
-                f"they will be added to your team!"
+                f"One-click Telegram Link:\n{join_link}\n\n"
+                f"Share this with your shop attendant. When they tap the link and press Start (or send *{inv.code}* to the bot), they will immediately join {biz.name} as an attendant!"
             )
             return [Reply(msg)]
         except Exception as e:
@@ -599,7 +599,11 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
                 f"You currently have no attendants registered for {biz.name}.\n\n"
                 f"Type /invite_staff to generate an invite code for your shop staff."
             )]
-        lines = [f"- {m.role.title()}: {m.name or 'Staff'} ({m.phone or 'Active'})" for m in members]
+        lines = []
+        for s in members:
+            u_mem = session.get(User, s.user_id)
+            display = (u_mem.display_name if u_mem else None) or (u_mem.channel_user_id if u_mem else None) or "Attendant"
+            lines.append(f"- {s.role.title()}: {display}")
         return [Reply(f"Team members for {biz.name}:\n" + "\n".join(lines) + "\n\nType /invite_staff to add an attendant.")]
 
     # Financial trade profile command
