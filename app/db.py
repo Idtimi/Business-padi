@@ -18,6 +18,31 @@ class Base(DeclarativeBase):
     """All database models inherit from this."""
 
 
+def ensure_columns():
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        is_sqlite = engine.dialect.name == "sqlite"
+        if is_sqlite:
+            for col_stmt in ("ALTER TABLE documents ADD COLUMN items_json JSON", "ALTER TABLE documents ADD COLUMN due_date VARCHAR"):
+                try:
+                    conn.execute(text(col_stmt))
+                    conn.commit()
+                except Exception:
+                    pass
+        else:
+            try:
+                conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS items_json JSON"))
+                conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS due_date VARCHAR"))
+                conn.commit()
+            except Exception:
+                pass
+
+try:
+    ensure_columns()
+except Exception:
+    pass
+
+
 def get_session():
     session = SessionLocal()
     try:

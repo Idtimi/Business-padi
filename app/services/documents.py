@@ -360,6 +360,8 @@ def issue_document(
         transaction_id=transaction_id,
         customer_id=customer_id,
         total_kobo=total_kobo,
+        items_json=items,
+        due_date=due_date,
         file_path=str(file_path),
         sha256=sha256,
         status="issued",

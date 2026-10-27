@@ -149,6 +149,8 @@ class Document(Base):
     transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id"), nullable=True)
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True)
     total_kobo: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    items_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    due_date: Mapped[str | None] = mapped_column(String, nullable=True)
     file_path: Mapped[str | None] = mapped_column(String, nullable=True)
     sha256: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default="issued")  # issued|cancelled

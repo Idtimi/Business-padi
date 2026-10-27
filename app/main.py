@@ -25,6 +25,24 @@ async def lifespan(app: FastAPI):
     # Automatically seed starter demo shop if database has no businesses
     with SessionLocal() as db:
         try:
+            from sqlalchemy import text
+            is_sqlite = db.bind and db.bind.dialect.name == "sqlite"
+            if is_sqlite:
+                for col_stmt in ("ALTER TABLE documents ADD COLUMN items_json JSON", "ALTER TABLE documents ADD COLUMN due_date VARCHAR"):
+                    try:
+                        db.execute(text(col_stmt))
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+            else:
+                db.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS items_json JSON"))
+                db.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS due_date VARCHAR"))
+                db.commit()
+        except Exception as e:
+            db.rollback()
+            log.debug("Column migration check: %s", e)
+
+        try:
             biz_count = db.query(m.Business).count()
             if biz_count == 0:
                 from scripts.seed_demo import seed_demo_data

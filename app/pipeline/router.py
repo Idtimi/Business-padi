@@ -1016,11 +1016,30 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
         if action in {"save", "issue"}:
             if p.kind.startswith("issue_"):
                 data = p.payload
+                tx_id = data.get("transaction_id")
+                if not tx_id and data.get("items"):
+                    from app.models import Transaction, now_iso
+                    tx = Transaction(
+                        business_id=business_id,
+                        customer_id=data.get("customer_id"),
+                        kind="sale",
+                        items_json=data.get("items"),
+                        total_kobo=data["total_kobo"],
+                        paid_kobo=data.get("paid_kobo", 0),
+                        due_date=data.get("due_date"),
+                        status="confirmed",
+                        created_by_user_id=user_id,
+                        created_at=now_iso(),
+                    )
+                    session.add(tx)
+                    session.flush()
+                    tx_id = tx.id
+
                 doc = documents.issue_document(
                     session=session,
                     business_id=business_id,
                     kind=data["kind"],
-                    transaction_id=data.get("transaction_id"),
+                    transaction_id=tx_id,
                     customer_id=data.get("customer_id"),
                     items=data.get("items"),
                     total_kobo=data["total_kobo"],

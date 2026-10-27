@@ -146,7 +146,13 @@ def public_download_receipt(doc_number: str, db: Session = Depends(get_db)):
     biz = db.get(Business, doc.business_id)
     cust = db.get(Customer, doc.customer_id) if doc.customer_id else None
     tx = db.get(Transaction, doc.transaction_id) if doc.transaction_id else None
-    items = tx.items_json if tx and tx.items_json else [{"name": "Order items", "qty": 1, "unit": "unit", "line_total_kobo": doc.total_kobo}]
+    items = None
+    if tx and tx.items_json:
+        items = tx.items_json
+    elif getattr(doc, "items_json", None):
+        items = doc.items_json
+    if not items:
+        items = [{"name": "Order items", "qty": 1, "unit": "unit", "line_total_kobo": doc.total_kobo}]
     paid = tx.paid_kobo if tx else (0 if doc.kind == "invoice" else doc.total_kobo)
     bal = max(0, (doc.total_kobo or 0) - paid)
     doc_kind = doc.kind.title() if doc.kind else "Invoice"
@@ -832,9 +838,13 @@ def download_document_pdf(
         # Generate on-the-fly if disk file missing
         cust = db.get(Customer, doc.customer_id) if doc.customer_id else None
         tx = db.get(Transaction, doc.transaction_id) if doc.transaction_id else None
-        items = (tx.items_json if tx and tx.items_json else [
-            {"name": "Items recorded", "qty": 1, "unit": "pkg", "unit_price_kobo": doc.total_kobo, "line_total_kobo": doc.total_kobo}
-        ])
+        items = None
+        if tx and tx.items_json:
+            items = tx.items_json
+        elif getattr(doc, "items_json", None):
+            items = doc.items_json
+        if not items:
+            items = [{"name": "Order items", "qty": 1, "unit": "unit", "line_total_kobo": doc.total_kobo}]
         paid = tx.paid_kobo if tx else (doc.total_kobo if doc.kind == "receipt" else 0)
         bal = max(0, doc.total_kobo - paid)
 
