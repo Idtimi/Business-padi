@@ -114,6 +114,36 @@ async def receive_telegram_webhook(request: Request):
                 button_id=None,
                 timestamp=datetime.now(timezone.utc),
             )
+        elif "photo" in m and isinstance(m["photo"], list) and len(m["photo"]) > 0:
+            best_photo = m["photo"][-1]
+            file_id = best_photo.get("file_id")
+            caption = m.get("caption")
+            msg = IncomingMessage(
+                channel="telegram",
+                user_ref=chat_id,
+                message_id=f"tg_{msg_id}",
+                kind="image",
+                text=caption,
+                media_ref=file_id,
+                button_id=None,
+                timestamp=datetime.now(timezone.utc),
+            )
+        elif "document" in m and (
+            (m["document"].get("mime_type") or "").startswith("image/")
+            or (m["document"].get("file_name") or "").lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
+        ):
+            file_id = m["document"].get("file_id")
+            caption = m.get("caption")
+            msg = IncomingMessage(
+                channel="telegram",
+                user_ref=chat_id,
+                message_id=f"tg_{msg_id}",
+                kind="image",
+                text=caption,
+                media_ref=file_id,
+                button_id=None,
+                timestamp=datetime.now(timezone.utc),
+            )
         elif "text" in m:
             raw_text = m.get("text", "").strip()
             # Normalize /start into friendly greeting or onboard
