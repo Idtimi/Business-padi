@@ -42,6 +42,47 @@ def _fmt_date(iso: str) -> str:
         return iso
 
 
+def _parse_restock_text(text: str) -> dict | None:
+    import re
+    clean = text.strip()
+    if clean.startswith("/"):
+        clean = clean[1:]
+    
+    m_cmd = re.match(
+        r"^restock(?:ed)?\s+(?:(\d+(?:\.\d+)?)\s*(?:([a-zA-Z]+)\s+of\s+|([a-zA-Z]+)\s+)?([a-zA-Z0-9\s]+?)|([a-zA-Z0-9\s]+?)\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?)(?:\s+(?:at|for|each|@)\s+([0-9kK,\.]+))?(?:\s+from\s+([a-zA-Z\s]+))?$",
+        clean,
+        re.IGNORECASE,
+    )
+    if m_cmd:
+        g = m_cmd.groups()
+        if g[0]:
+            qty = float(g[0])
+            unit = g[1] or g[2] or "unit"
+            item = g[3].strip()
+        else:
+            item = g[4].strip()
+            qty = float(g[5])
+            unit = g[6] or "unit"
+        price = g[7]
+        supplier = g[8].strip() if g[8] else None
+        return {"item": item, "qty": qty, "unit": unit, "price": price, "supplier": supplier}
+
+    m_nat = re.search(
+        r"(?:i\s+(?:just\s+)?(?:got|bought|receive|received)|(?:just\s+)?got|added)\s+(\d+(?:\.\d+)?)\s*(?:([a-zA-Z]+)\s+of\s+|([a-zA-Z]+)\s+)?([a-zA-Z0-9\s]+?)(?:\s+(?:in|to)\s+stock|\s+(?:at|for|each|@)\s+([0-9kK,\.]+)|$)",
+        clean,
+        re.IGNORECASE,
+    )
+    if m_nat:
+        qty = float(m_nat.group(1))
+        unit = m_nat.group(2) or m_nat.group(3) or "unit"
+        item = m_nat.group(4).replace("in stock", "").replace("to stock", "").strip()
+        price = m_nat.group(5)
+        return {"item": item, "qty": qty, "unit": unit, "price": price, "supplier": None}
+
+    return None
+
+
+
 def confirmation_text(lang: str, v: Validated, speech_lang: str | None = None) -> str:
     label = t(lang, v.intent)
     out = []
@@ -313,6 +354,107 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         session.commit()
         return [Reply(rep_text)]
 
+    # Inventory & Stock commands: /stock, /items, /inventory
+    if any(lower == k or lower.startswith(k + " ") for k in ("/stock", "stock", "/inventory", "inventory", "/items", "items", "check stock")):
+        from app.models import StockItem
+        from app.services import plans
+        if biz and not plans.allowed(biz, "stock_tracking"):
+            return [Reply("Stock tracking is available on Trader and Business plans. Type /plan to upgrade.")]
+        items = session.scalars(
+            select(StockItem).where(StockItem.business_id == business_id).order_by(StockItem.name.asc())
+        ).all()
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        if not items:
+            return [Reply(
+                f"No items in {biz.name if biz else 'shop'}'s inventory yet.\n\n"
+                f"To add items:\n"
+                f"- /add_item <Product Name> [unit]\n"
+                f"- /restock <Product Name> <Quantity>\n"
+                f"- Or manage inventory on your web dashboard: /dashboard"
+            )]
+        lines = [f"INVENTORY - {biz.name if biz else 'Shop'}\n"]
+        for it in items:
+            unit_str = f" {it.base_unit}" if it.base_unit else ""
+            status_str = "In Stock"
+            if it.qty < 0:
+                status_str = "Negative Stock"
+            elif it.low_at is not None and it.qty <= it.low_at:
+                status_str = "Low Stock"
+            elif it.qty == 0:
+                status_str = "Out of Stock"
+            cost_str = f" (Avg cost: {fmt_naira(it.avg_cost_kobo)})" if it.avg_cost_kobo > 0 else ""
+            lines.append(f"- {it.name}: {it.qty:g}{unit_str} [{status_str}]{cost_str}")
+        lines.append("\nTo add more stock: /restock <item> <qty>\nTo register a new item: /add_item <name>")
+        return [Reply("\n".join(lines))]
+
+    # Add item to catalog: /add_item <Product Name> [Unit]
+    if lower.startswith("/add_item") or lower.startswith("add item "):
+        from app.services import stock
+        parts = text.split()
+        if len(parts) >= 2:
+            rem = text[len(parts[0]):].strip()
+            rem_parts = rem.split()
+            if len(rem_parts) == 1:
+                item_name = rem_parts[0]
+                base_unit = "unit"
+            else:
+                item_name = " ".join(rem_parts[:-1])
+                base_unit = rem_parts[-1]
+            item = stock.get_or_create_item(session, business_id, item_name, base_unit=base_unit)
+            session.commit()
+            session.add(ProcessedMessage(channel=channel, message_id=message_id))
+            session.commit()
+            return [Reply(f"Added \"{item.name}\" (unit: {item.base_unit}) to {biz.name if biz else 'shop'}'s catalog!\nType /restock {item.name} <qty> to add inventory.")]
+        return [Reply("Usage: /add_item <Product Name> [Unit]\nExample: /add_item Rice bag")]
+
+    # Check for empty /restock prompt
+    if lower in ("/restock", "restock"):
+        return [Reply(
+            "To restock an item, type e.g.:\n"
+            "- /restock Rice 30 bags\n"
+            "- /restock Rice 30 bags at 45000\n"
+            "- /restock Indomie 10 cartons from Alhaji Musa\n\n"
+            "Or speak naturally: 'I just got 30 bags of rice in stock'."
+        )]
+
+    # Parse and execute restock command or natural language
+    restock_data = _parse_restock_text(text)
+    if restock_data and (lower.startswith("/restock") or lower.startswith("restock") or "in stock" in lower or "to stock" in lower or "got " in lower):
+        from app.services import plans, stock
+        from app.money import to_kobo
+        if biz and not plans.allowed(biz, "stock_tracking"):
+            return [Reply("Stock tracking is available on Trader and Business plans. Type /plan to upgrade.")]
+        cost_val = 0
+        if restock_data.get("price"):
+            raw_p = str(restock_data["price"]).lower().replace(",", "").replace("k", "000")
+            try:
+                cost_val = float(raw_p)
+            except ValueError:
+                cost_val = 0
+        cost_kobo = to_kobo(cost_val) if cost_val > 0 else 0
+        item, move = stock.record_restock(
+            session=session,
+            business_id=business_id,
+            item_name=restock_data["item"],
+            qty=restock_data["qty"],
+            unit=restock_data["unit"],
+            unit_cost_kobo=cost_kobo,
+            supplier=restock_data.get("supplier"),
+        )
+        session.commit()
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+
+        cost_txt = f" (Avg cost: {fmt_naira(item.avg_cost_kobo)})" if item.avg_cost_kobo > 0 else ""
+        unit_txt = f" {item.base_unit}" if item.base_unit else ""
+        reply_msg = (
+            f"Restocked {restock_data['qty']:g}{unit_txt} of {item.name}!\n"
+            f"Current stock on hand: {item.qty:g}{unit_txt}.{cost_txt}\n\n"
+            f"You can view your full inventory anytime with /stock or on your dashboard."
+        )
+        return [Reply(reply_msg)]
+
     # Help and all commands guide
     if lower in ("/commands", "commands", "/help", "help", "/menu", "menu"):
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
@@ -328,6 +470,10 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
             "RECEIPTS & DOCUMENTS\n"
             "/receipt - Download PDF receipt for latest sale + send to customer\n"
             "/invoice - Generate PDF invoice for customer orders\n\n"
+            "INVENTORY & STOCK\n"
+            "/stock (or /items) - View all products, stock quantities, and alerts\n"
+            "/restock <item> <qty> - Add new inventory for any product\n"
+            "/add_item <name> [unit] - Register a new product to your shop catalog\n\n"
             "WEB DASHBOARD\n"
             "/dashboard (or /login) - Get direct link to your shop's web dashboard\n\n"
             "DEBTS & REPORTS\n"
@@ -538,6 +684,15 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
 
 
 def _saved_text(session, business_id, tx, lang) -> str:
+    if tx.kind == "restock":
+        items_summary = []
+        for line in (tx.items_json or []):
+            qty_str = f"{line.get('qty', 0):g}"
+            unit_str = f" {line.get('unit')}" if line.get("unit") else ""
+            items_summary.append(f"{qty_str}{unit_str} {line.get('name', 'item')}")
+        summary_str = ", ".join(items_summary) if items_summary else "Inventory"
+        return f"Restocked {summary_str}! Stock level has been updated."
+
     if tx.status == "pending":
         if lang == "yo":
             return f"A ti se akosile tita {fmt_naira(tx.total_kobo)}, sugbon yoo duro de ase oga."

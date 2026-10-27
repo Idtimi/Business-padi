@@ -113,14 +113,24 @@ def test_full_onboarding_flow_with_skip_logo(factory):
         assert u.state == "CONTACT"
         assert "address" in channel.sent[-1]["text"].lower()
 
-    # Step 7: Contact / Address (CONTACT -> DONE)
+    # Step 7: Contact / Address (CONTACT -> PRODUCTS)
     with factory() as s:
         asyncio.run(handle_incoming(channel, make_msg(user_ref, text="12 Balogun Street, Lagos. 08012345678", mid="step7"), s))
         u = s.scalar(select(m.User).where(m.User.channel_user_id == user_ref))
         b = s.scalar(select(m.Business).where(m.Business.owner_user_id == u.id))
-        assert u.state == "DONE"
+        assert u.state == "PRODUCTS"
         assert b.address == "12 Balogun Street, Lagos. 08012345678"
+        assert "products" in channel.sent[-1]["text"].lower() or "items" in channel.sent[-1]["text"].lower()
+
+    # Step 8: Products Catalog (PRODUCTS -> DONE)
+    with factory() as s:
+        asyncio.run(handle_incoming(channel, make_msg(user_ref, text="Rice, Cement, Indomie", mid="step8"), s))
+        u = s.scalar(select(m.User).where(m.User.channel_user_id == user_ref))
+        b = s.scalar(select(m.Business).where(m.Business.owner_user_id == u.id))
+        assert u.state == "DONE"
         assert "all set" in channel.sent[-1]["text"].lower()
+        items = s.scalars(select(m.StockItem).where(m.StockItem.business_id == b.id)).all()
+        assert len(items) == 3
 
 
 def test_ledger_blocked_before_consent(factory):

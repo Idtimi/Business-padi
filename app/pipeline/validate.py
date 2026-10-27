@@ -84,16 +84,21 @@ def validate(x: Extracted) -> Validated:
     for item in x.items:
         line = _build_line(item)
         if line is None:
-            v.problems.append(f"How much is {item.name or 'the item'}? Abeg tell me qty and price.")
-            return v
+            if x.intent == "restock" and (item.qty or item.name):
+                # Restocking allows quantity without mandatory cost price
+                qty = float(item.qty) if item.qty is not None else 1.0
+                line = Line(item.name, qty, item.unit, 0, 0)
+            else:
+                v.problems.append(f"How much is {item.name or 'the item'}? Abeg tell me qty and price.")
+                return v
         v.lines.append(line)
     if v.lines:
         v.total_kobo = sum(l.line_total_kobo for l in v.lines)
     elif x.amount is not None:
         v.total_kobo = to_kobo(x.amount)
 
-    # Reject zero, negative or absurd amounts
-    needs_amount = x.intent in {"sale", "expense", "payment_received", "restock", "invoice", "receipt"}
+    # Reject zero, negative or absurd amounts (restock is permitted with 0 cost)
+    needs_amount = x.intent in {"sale", "expense", "payment_received", "invoice", "receipt"}
     if needs_amount and v.total_kobo <= 0 and (x.items or x.amount is not None):
         v.problems.append("I no see the amount. How much be am?")
         return v

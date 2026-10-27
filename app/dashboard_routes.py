@@ -29,8 +29,8 @@ from app.models import (
     get_tz,
     now_iso,
 )
-from app.money import fmt_naira
-from app.services import billing, dashboard, documents, ledger, plans, reports, staff
+from app.money import fmt_naira, to_kobo
+from app.services import billing, dashboard, documents, ledger, plans, reports, staff, stock
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -901,8 +901,62 @@ def stock_page(
             "business": biz,
             "stock_items": items,
             "active_page": "stock",
+            "success": request.query_params.get("success"),
         },
     )
+
+
+@router.post("/stock/restock")
+def restock_item_form(
+    request: Request,
+    item_name: str = Form(...),
+    qty: float = Form(...),
+    unit: str = Form("unit"),
+    unit_cost: float | None = Form(None),
+    supplier: str | None = Form(None),
+    low_at: float | None = Form(None),
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    import urllib.parse
+    user, biz = auth
+    cost_kobo = to_kobo(unit_cost) if unit_cost is not None and unit_cost > 0 else 0
+    item, move = stock.record_restock(
+        session=db,
+        business_id=biz.id,
+        item_name=item_name.strip(),
+        qty=float(qty),
+        unit=unit.strip().lower() if unit else "unit",
+        unit_cost_kobo=cost_kobo,
+        supplier=supplier.strip() if supplier else None,
+    )
+    if low_at is not None and low_at > 0:
+        item.low_at = float(low_at)
+    db.commit()
+    msg = urllib.parse.quote(f"Restocked {qty:g} {unit} of {item.name}")
+    return RedirectResponse(url=f"/d/stock?success={msg}", status_code=303)
+
+
+@router.post("/stock/add_item")
+def add_item_form(
+    item_name: str = Form(...),
+    base_unit: str = Form("unit"),
+    low_at: float | None = Form(None),
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    import urllib.parse
+    user, biz = auth
+    item = stock.get_or_create_item(
+        session=db,
+        business_id=biz.id,
+        name=item_name.strip(),
+        base_unit=base_unit.strip().lower() if base_unit else "unit",
+        low_at=float(low_at) if low_at else None,
+    )
+    db.commit()
+    msg = urllib.parse.quote(f"Added {item.name} to catalog")
+    return RedirectResponse(url=f"/d/stock?success={msg}", status_code=303)
 
 
 @router.get("/staff", response_class=HTMLResponse)

@@ -512,21 +512,56 @@ async def handle_onboarding(channel, msg: IncomingMessage, user: User,
         if not skipped and text and biz:
             biz.address = text
 
+        user.state = "PRODUCTS"
+        session.commit()
+
+        if user.language == "yo":
+            p_prompt = "Awon oja wo ni e n ta ni soobu yin? (apeere: Rice, Cement, Indomie, Ose) - ko won pelu aami koma, tabi ki e te [Fo o kọja]:"
+            p_buttons = [("products:skip", "Fo o kọja")]
+        elif user.language == "ha":
+            p_prompt = "Wadanne kayayyaki kuke sayarwa a shagon ku? (misali: Shinkafa, Siminti, Indomie, Sabulu) - rubuta su da alamar koma, ko [Tsallake]:"
+            p_buttons = [("products:skip", "Tsallake")]
+        elif user.language == "ig":
+            p_prompt = "Kedu ngwa ahia i na-ere na ulo ahia gi? (dika: Osikapa, Siment, Indomie, Ncha) - dee ha ma tinye koma, ma obu pia [Mfegharịa]:"
+            p_buttons = [("products:skip", "Mfegharịa")]
+        elif user.language == "pcm":
+            p_prompt = "Wetin you dey sell for your shop? (e.g. Rice, Cement, Indomie, Sugar, Soap) - type dem with comma, or tap [Skip]:"
+            p_buttons = [("products:skip", "Skip")]
+        else:
+            p_prompt = "What products or items do you sell in your shop? (e.g. Rice, Cement, Indomie, Sugar, Soap) - type items separated by commas, or tap [Skip]:"
+            p_buttons = [("products:skip", "Skip")]
+
+        return [Reply(p_prompt, buttons=p_buttons, kind="confirm")]
+
+    # State: PRODUCTS
+    if user.state == "PRODUCTS":
+        biz = session.scalar(select(Business).where(Business.owner_user_id == user.id))
+        skipped = (btn == "products:skip") or text.lower().strip() in {"1", "skip", "no", "later", "fo o koja", "tsallake", "mfegharia"}
+
+        added_names = []
+        if not skipped and text and biz:
+            from app.services import stock
+            raw_items = [x.strip() for x in text.replace("\n", ",").split(",") if x.strip() and len(x.strip()) > 1]
+            for iname in raw_items:
+                stock.get_or_create_item(session, biz.id, iname)
+                added_names.append(iname.title())
+
         # Final transition to DONE
         user.state = "DONE"
         session.commit()
 
         shop_title = (biz.name if biz and biz.name else "Your shop")
+        items_msg = f" Added {len(added_names)} products to your catalog ({', '.join(added_names)})." if added_names else ""
         if user.language == "yo":
-            done_text = f"Gbogbo e ti se tan! Soobu {shop_title} ti wa ni soki.\n\nGbiyanju: so tita kan fun mi lori ohun (voice note) tabi ko o sile."
+            done_text = f"Gbogbo e ti se tan! Soobu {shop_title} ti wa ni soki.{items_msg}\n\nGbiyanju: so tita kan fun mi lori ohun (voice note) tabi restock pelu /restock."
         elif user.language == "ha":
-            done_text = f"Komai ya shirya! Shagon {shop_title} ya shirya yanzu.\n\nGwada: gaya mini sayarwa daya ta hanyar sautin murya (voice note) ko rubuta shi."
+            done_text = f"Komai ya shirya! Shagon {shop_title} ya shirya yanzu.{items_msg}\n\nGwada: gaya mini sayarwa daya ta hanyar sautin murya (voice note) ko /restock."
         elif user.language == "ig":
-            done_text = f"Ihe niile adịla njikere! Ulo ahia {shop_title} adịla njikere ugbu a.\n\nNwaa ya: gwa m otu ahia site na ozi olu (voice note) ma obu dee ya ede."
+            done_text = f"Ihe niile adịla njikere! Ulo ahia {shop_title} adịla njikere ugbu a.{items_msg}\n\nNwaa ya: gwa m otu ahia site na ozi olu (voice note) ma obu /restock."
         elif user.language == "pcm":
-            done_text = f"All set! {shop_title} don ready.\n\nTry am: tell me one sale by voice note."
+            done_text = f"All set! {shop_title} don ready.{items_msg}\n\nTry am: tell me one sale by voice note, or restock with /restock."
         else:
-            done_text = f"All set! {shop_title} is ready.\n\nTry: tell me one sale by voice note."
+            done_text = f"All set! {shop_title} is ready.{items_msg}\n\nTry: record a sale by voice note or text, restock with /restock, or type /dashboard."
 
         return [Reply(done_text)]
 

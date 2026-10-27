@@ -3,11 +3,96 @@
 {% block title %}Stock & Inventory{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+{% if success %}
+<div style="background-color: #DCFCE7; border: 1px solid #86EFAC; color: #166534; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; font-weight: 600;">
+    {{ success }}
+</div>
+{% endif %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
     <div>
         <h1 style="font-size: 1.5rem; font-weight: 700;">Stock & Inventory</h1>
         <p style="color: var(--text-muted); font-size: 0.9rem;">Track stock balances, unit costs, and reorder alerts.</p>
     </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <button onclick="toggleForm('restockForm')" class="btn btn-primary" style="padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer;">
+            + Restock Item
+        </button>
+        <button onclick="toggleForm('newItemForm')" class="btn" style="padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; background: #fff; border: 1px solid var(--border);">
+            + Add New Product
+        </button>
+    </div>
+</div>
+
+<!-- Restock Form Card -->
+<div id="restockForm" class="card" style="display: none; margin-bottom: 1.5rem; border: 2px solid var(--primary); background: #FFFBF8;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--navy);">Restock Inventory</h3>
+        <button type="button" onclick="toggleForm('restockForm')" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+    </div>
+    <form action="/d/stock/restock" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: flex-end;">
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Product Name *</label>
+            <input type="text" name="item_name" id="restock_item_name" required placeholder="e.g. Rice, Indomie, Cement" list="existing_items" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <datalist id="existing_items">
+                {% for it in stock_items %}
+                <option value="{{ it.name }}">
+                {% endfor %}
+            </datalist>
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Quantity to Add *</label>
+            <input type="number" step="any" name="qty" required placeholder="e.g. 30" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Unit</label>
+            <input type="text" name="unit" id="restock_unit" placeholder="bags, cartons, pcs, kg" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Unit Cost (₦)</label>
+            <input type="number" step="any" name="unit_cost" placeholder="Optional purchase cost" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Supplier</label>
+            <input type="text" name="supplier" placeholder="Optional supplier name" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Low Stock Alert Level</label>
+            <input type="number" step="any" name="low_at" placeholder="Alert when below" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.55rem; font-weight: 700; border-radius: 6px; cursor: pointer;">
+                Save Restock
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Add New Product Form Card -->
+<div id="newItemForm" class="card" style="display: none; margin-bottom: 1.5rem; border: 2px solid var(--info); background: #F8FAFC;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--navy);">Register New Product to Catalog</h3>
+        <button type="button" onclick="toggleForm('newItemForm')" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+    </div>
+    <form action="/d/stock/add_item" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: flex-end;">
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Product Name *</label>
+            <input type="text" name="item_name" required placeholder="e.g. Milo, Sugar, Vegetable Oil" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Base Unit (e.g. bag, carton, tin)</label>
+            <input type="text" name="base_unit" value="unit" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Low Stock Reorder Alert Level</label>
+            <input type="number" step="any" name="low_at" placeholder="e.g. 5" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <button type="submit" class="btn" style="width: 100%; padding: 0.55rem; font-weight: 700; border-radius: 6px; cursor: pointer; background: var(--navy); color: #fff; border: none;">
+                Add to Catalog
+            </button>
+        </div>
+    </form>
 </div>
 
 <div class="card">
@@ -21,6 +106,7 @@
                     <th>Average Unit Cost</th>
                     <th>Reorder Level</th>
                     <th>Status</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -28,9 +114,9 @@
                     {% for item in stock_items %}
                     <tr>
                         <td style="font-weight: 600;">{{ item.name }}</td>
-                        <td>{{ item.base_unit or "pcs" }}</td>
+                        <td>{{ item.base_unit or "unit" }}</td>
                         <td style="font-weight: 700; {% if item.qty < 0 %}color: var(--danger);{% elif item.low_at and item.qty <= item.low_at %}color: var(--warning);{% endif %}">
-                            {{ item.qty }}
+                            {{ item.qty | round(2) }}
                         </td>
                         <td>{{ item.avg_cost_kobo | fmt_naira }}</td>
                         <td>{{ item.low_at or "-" }}</td>
@@ -39,19 +125,50 @@
                                 <span class="badge badge-danger">Negative Stock</span>
                             {% elif item.low_at and item.qty <= item.low_at %}
                                 <span class="badge badge-warning">Low Stock</span>
+                            {% elif item.qty == 0 %}
+                                <span class="badge badge-secondary" style="background:#E2E8F0; color:#475569;">Out of Stock</span>
                             {% else %}
                                 <span class="badge badge-success">In Stock</span>
                             {% endif %}
+                        </td>
+                        <td>
+                            <button onclick="quickRestock('{{ item.name }}', '{{ item.base_unit or '' }}')" style="background: none; border: 1px solid var(--primary); color: var(--primary); padding: 0.25rem 0.6rem; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
+                                + Restock
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No stock items recorded yet. Restock items via WhatsApp voice note or text!</td>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+                            No stock items recorded yet.<br>
+                            Click <strong>+ Restock Item</strong> above, or restock by voice/text in chat!
+                        </td>
                     </tr>
                 {% endif %}
             </tbody>
         </table>
     </div>
 </div>
+
+<script>
+function toggleForm(id) {
+    const el = document.getElementById(id);
+    if (el.style.display === 'none' || el.style.display === '') {
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+function quickRestock(name, unit) {
+    const form = document.getElementById('restockForm');
+    form.style.display = 'block';
+    document.getElementById('restock_item_name').value = name;
+    if (unit) {
+        document.getElementById('restock_unit').value = unit;
+    }
+    form.scrollIntoView({ behavior: 'smooth' });
+}
+</script>
 {% endblock %}

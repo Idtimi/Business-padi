@@ -223,3 +223,64 @@ def test_stock_gated_by_plan(session):
     item_trader, move = stock.record_restock(session, b_trader.id, "Rice", qty=5.0, unit="bag", unit_cost_kobo=to_kobo(40_000))
     assert item_trader.qty == 5.0
     assert move is not None
+
+
+def test_restock_from_chat_commands_and_natural_language(session):
+    """Test restocking in chat via /restock command, natural language, and checking inventory with /stock."""
+    u, b = make_business(session, "Mama Chioma Mart", plan="trader")
+
+    # 1. Natural language: "i just got 30 bags of rice in stock"
+    r1 = router.handle_text(session, b.id, u.id, "i just got 30 bags of rice in stock", "msg-1")
+    assert len(r1) == 1
+    assert "Restocked 30 bags of rice" in r1[0].text or "Restocked 30 bags of Rice" in r1[0].text
+    assert "Current stock on hand: 30" in r1[0].text
+
+    # 2. Command: "/restock indomie 15 cartons at 14000"
+    r2 = router.handle_text(session, b.id, u.id, "/restock indomie 15 cartons at 14000", "msg-2")
+    assert len(r2) == 1
+    assert "Restocked 15 cartons of indomie" in r2[0].text or "Restocked 15 cartons of Indomie" in r2[0].text
+    assert "14,000" in r2[0].text
+
+    # 3. Check inventory: "/stock"
+    r3 = router.handle_text(session, b.id, u.id, "/stock", "msg-3")
+    assert len(r3) == 1
+    assert "INVENTORY" in r3[0].text
+    assert "Rice: 30" in r3[0].text or "rice: 30" in r3[0].text.lower()
+    assert "Indomie: 15" in r3[0].text or "indomie: 15" in r3[0].text.lower()
+
+
+def test_dashboard_restock_and_add_item_endpoints(session, monkeypatch):
+    """Test restocking and adding catalog items from web dashboard forms."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    import app.dashboard_routes as d_routes
+    from app.services import dashboard
+
+    monkeypatch.setattr(d_routes, "SessionLocal", lambda: session)
+
+    u, b = make_business(session, "Web Stock Store", plan="trader")
+    token = dashboard.create_session_cookie(u.id, b.id)
+
+    client = TestClient(app)
+    client.cookies.set(dashboard.SESSION_COOKIE_NAME, token)
+
+    # 1. Add item to catalog via POST /d/stock/add_item
+    r_add = client.post("/d/stock/add_item", data={"item_name": "Sugar", "base_unit": "bag", "low_at": "5"}, follow_redirects=True)
+    assert r_add.status_code == 200
+    sugar = session.scalar(select(m.StockItem).where(m.StockItem.business_id == b.id, m.StockItem.name == "Sugar"))
+    assert sugar is not None
+    assert sugar.base_unit == "bag"
+
+    # 2. Restock via POST /d/stock/restock
+    r_restock = client.post("/d/stock/restock", data={
+        "item_name": "Sugar",
+        "qty": "25",
+        "unit": "bag",
+        "unit_cost": "35000",
+        "supplier": "Dangote Sugar",
+    }, follow_redirects=True)
+    assert r_restock.status_code == 200
+    sugar = session.scalar(select(m.StockItem).where(m.StockItem.business_id == b.id, m.StockItem.name == "Sugar"))
+    assert sugar.qty == 25.0
+    assert sugar.avg_cost_kobo == to_kobo(35_000)
+
