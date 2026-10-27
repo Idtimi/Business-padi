@@ -106,6 +106,7 @@ class Transaction(Base):
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[str] = mapped_column(String, default=now_iso)
     source_msg_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    reconciled_at: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class Payment(Base):
@@ -117,6 +118,7 @@ class Payment(Base):
     amount_kobo: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[str] = mapped_column(String, default=now_iso)
     source_msg_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    reconciled_at: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class PendingAction(Base):

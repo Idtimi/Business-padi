@@ -485,7 +485,7 @@
             <a href="/d/customers" class="nav-link {% if active_page == 'customers' %}active{% endif %}">Customers</a>
             <a href="/d/documents" class="nav-link {% if active_page == 'documents' %}active{% endif %}">Documents</a>
             <a href="/d/stock" class="nav-link {% if active_page == 'stock' %}active{% endif %}">Stock</a>
-            <a href="/d/staff" class="nav-link {% if active_page == 'staff' %}active{% endif %}">Staff</a>
+            <a href="/d/staff" class="nav-link {% if active_page in ('staff', 'audit') %}active{% endif %}">Staff & Audit</a>
             <a href="/d/reports" class="nav-link {% if active_page == 'reports' %}active{% endif %}">Reports</a>
             <a href="/d/profile" class="nav-link {% if active_page == 'profile' %}active{% endif %}">Profile</a>
             <a href="/d/billing" class="nav-link {% if active_page == 'billing' %}active{% endif %}">Plans & Billing</a>

@@ -3,7 +3,7 @@ from dataclasses import asdict
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Business, Customer, Payment, Transaction
+from app.models import Business, Customer, Payment, Transaction, now_iso
 from app.money import fmt_naira, to_kobo
 from app.pipeline.validate import Validated, clean_name
 from app.services import pending
@@ -109,8 +109,12 @@ def confirm(session: Session, business_id: int, pending_id: int) -> Transaction:
 
     customer = get_or_create_customer(session, business_id, data.get("customer"))
     from app.services import staff
-    needs_owner_approval = (data["intent"] == "sale") and staff.needs_approval(session, business_id, p.user_id, data["total_kobo"])
-    tx_status = "pending" if needs_owner_approval else "confirmed"
+    biz = session.get(Business, business_id)
+    is_owner_actor = (biz is not None and biz.owner_user_id == p.user_id)
+    # Attendant sales are confirmed immediately to allow receipt/invoice issuing and immediate stock deduction.
+    # Attendant records have reconciled_at=None so the owner can audit and approve all daily sales at end of day.
+    tx_status = "confirmed"
+    reconciled_at = now_iso() if is_owner_actor else None
 
     tx = Transaction(
         business_id=business_id,
@@ -126,53 +130,45 @@ def confirm(session: Session, business_id: int, pending_id: int) -> Transaction:
         transcript=data.get("transcript"),
         created_by_user_id=p.user_id,
         source_msg_id=data["source_msg_id"],
+        reconciled_at=reconciled_at,
     )
     session.add(tx)
     session.flush()
 
-    if tx_status == "pending":
-        biz = session.get(Business, business_id)
-        if biz:
-            pending.create(
-                session, business_id, biz.owner_user_id, "staff_approval",
-                {"transaction_id": tx.id, "amount_kobo": tx.total_kobo, "staff_user_id": p.user_id}
-            )
-        staff.log_audit(session, business_id, p.user_id, "create_pending", f"tx:{tx.id}")
-    else:
-        staff.log_audit(session, business_id, p.user_id, "create", f"tx:{tx.id}")
-        if data["intent"] == "payment_received" and customer is not None:
-            _allocate_payment(session, business_id, customer.id, data["total_kobo"], data["source_msg_id"])
+    staff.log_audit(session, business_id, p.user_id, "create", f"tx:{tx.id}")
+    if data["intent"] == "payment_received" and customer is not None:
+        _allocate_payment(session, business_id, customer.id, data["total_kobo"], data["source_msg_id"])
+        from app.services import reminders
+        reminders.sync_reminders_after_payment(session, business_id, customer.id)
+    elif tx.kind == "sale":
+        if tx.due_date and tx.paid_kobo < tx.total_kobo and customer is not None:
             from app.services import reminders
-            reminders.sync_reminders_after_payment(session, business_id, customer.id)
-        elif tx.kind == "sale":
-            if tx.due_date and tx.paid_kobo < tx.total_kobo and customer is not None:
-                from app.services import reminders
-                reminders.schedule_reminders_for_sale(session, business_id, customer.id, tx.id, tx.due_date)
-            from app.services import stock
-            for line in (data.get("lines") or []):
-                if line.get("name") and line.get("qty"):
-                    stock.record_sale(
-                        session=session,
-                        business_id=business_id,
-                        item_name=line.get("name"),
-                        qty=line.get("qty", 1.0),
-                        unit=line.get("unit"),
-                        transaction_id=tx.id,
-                    )
-        elif tx.kind == "restock":
-            from app.services import stock
-            for line in (data.get("lines") or []):
-                if line.get("name") and line.get("qty"):
-                    stock.record_restock(
-                        session=session,
-                        business_id=business_id,
-                        item_name=line.get("name"),
-                        qty=line.get("qty", 1.0),
-                        unit=line.get("unit"),
-                        unit_cost_kobo=line.get("unit_price_kobo", 0),
-                        supplier=data.get("supplier"),
-                        transaction_id=tx.id,
-                    )
+            reminders.schedule_reminders_for_sale(session, business_id, customer.id, tx.id, tx.due_date)
+        from app.services import stock
+        for line in (data.get("lines") or []):
+            if line.get("name") and line.get("qty"):
+                stock.record_sale(
+                    session=session,
+                    business_id=business_id,
+                    item_name=line.get("name"),
+                    qty=line.get("qty", 1.0),
+                    unit=line.get("unit"),
+                    transaction_id=tx.id,
+                )
+    elif tx.kind == "restock":
+        from app.services import stock
+        for line in (data.get("lines") or []):
+            if line.get("name") and line.get("qty"):
+                stock.record_restock(
+                    session=session,
+                    business_id=business_id,
+                    item_name=line.get("name"),
+                    qty=line.get("qty", 1.0),
+                    unit=line.get("unit"),
+                    unit_cost_kobo=line.get("unit_price_kobo", 0),
+                    supplier=data.get("supplier"),
+                    transaction_id=tx.id,
+                )
 
     p.status = "applied"
     session.commit()
@@ -192,7 +188,18 @@ def customer_balance_kobo(session: Session, business_id: int, customer_id: int) 
 
 # ---------- Phase 3: Corrections ----------
 
-def get_last_transaction(session: Session, business_id: int) -> Transaction | None:
+def get_last_transaction(session: Session, business_id: int, user_id: int | None = None) -> Transaction | None:
+    if user_id:
+        tx = session.scalar(
+            select(Transaction).where(
+                Transaction.business_id == business_id,
+                Transaction.created_by_user_id == user_id,
+                Transaction.status == "confirmed",
+            ).order_by(Transaction.id.desc())
+        )
+        if tx:
+            return tx
+
     return session.scalar(
         select(Transaction).where(
             Transaction.business_id == business_id,

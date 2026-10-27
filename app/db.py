@@ -23,7 +23,12 @@ def ensure_columns():
     with engine.connect() as conn:
         is_sqlite = engine.dialect.name == "sqlite"
         if is_sqlite:
-            for col_stmt in ("ALTER TABLE documents ADD COLUMN items_json JSON", "ALTER TABLE documents ADD COLUMN due_date VARCHAR"):
+            for col_stmt in (
+                "ALTER TABLE documents ADD COLUMN items_json JSON",
+                "ALTER TABLE documents ADD COLUMN due_date VARCHAR",
+                "ALTER TABLE transactions ADD COLUMN reconciled_at VARCHAR",
+                "ALTER TABLE payments ADD COLUMN reconciled_at VARCHAR",
+            ):
                 try:
                     conn.execute(text(col_stmt))
                     conn.commit()
@@ -33,6 +38,8 @@ def ensure_columns():
             try:
                 conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS items_json JSON"))
                 conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS due_date VARCHAR"))
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reconciled_at VARCHAR"))
+                conn.execute(text("ALTER TABLE payments ADD COLUMN IF NOT EXISTS reconciled_at VARCHAR"))
                 conn.commit()
             except Exception:
                 pass

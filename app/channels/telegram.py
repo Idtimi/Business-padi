@@ -38,6 +38,14 @@ class TelegramChannel:
         resp.raise_for_status()
         return resp.json()
 
+    async def send_chat_action(self, user_ref: str, action: str = "typing") -> None:
+        """Send chat status action (e.g. 'typing', 'record_voice') to indicate work in progress."""
+        try:
+            url = f"{self._base_url}/sendChatAction"
+            await self._client.post(url, json={"chat_id": user_ref, "action": action})
+        except Exception as e:
+            log.debug("Failed to send chat action %s to %s: %s", action, user_ref, e)
+
     async def send_buttons(
         self,
         user_ref: str,

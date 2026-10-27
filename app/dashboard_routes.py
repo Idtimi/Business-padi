@@ -81,6 +81,15 @@ def get_current_user_and_biz(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User or business not found.",
         )
+
+    # Restrict dashboard access to shop owners only
+    from app.services import staff
+    if not staff.is_owner(db, biz.id, user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted: The web dashboard is reserved exclusively for the shop owner.",
+        )
+
     return user, biz
 
 
@@ -108,6 +117,17 @@ def login_page(request: Request, token: str | None = None, error: str | None = N
                 "error.html",
                 {"title": "Login Failed", "message": msg},
                 status_code=401,
+            )
+        from app.services import staff
+        if not staff.is_owner(db, action.business_id, action.user_id):
+            return templates.TemplateResponse(
+                request,
+                "error.html",
+                {
+                    "title": "Access Restricted",
+                    "message": "The web dashboard is reserved exclusively for the shop owner. Shop attendants can manage all activities directly through the Telegram bot.",
+                },
+                status_code=403,
             )
         # Create session cookie and redirect to overview
         cookie = dashboard.create_session_cookie(action.user_id, action.business_id)
@@ -1022,6 +1042,9 @@ def staff_page(
     message = request.query_params.get("message")
     error = request.query_params.get("error")
 
+    from app.services import staff as staff_service
+    daily_audit = staff_service.get_daily_staff_audit(db, biz.id)
+
     return templates.TemplateResponse(
         request,
         "staff.html",
@@ -1032,9 +1055,48 @@ def staff_page(
             "invites": invites,
             "max_staff": max_staff,
             "active_page": "staff",
+            "daily_audit": daily_audit,
             "message": message,
             "error": error,
         },
+    )
+
+
+@router.get("/audit", response_class=HTMLResponse)
+def audit_overview_page(
+    request: Request,
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    return staff_overview_route(request, auth, db)
+
+
+@router.post("/staff/reconcile-all")
+def reconcile_all_staff_sales_route(
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    from app.services import staff as staff_service
+    count, total_kobo = staff_service.reconcile_all_daily_transactions(db, biz.id, user.id)
+    return RedirectResponse(
+        url=f"/d/staff?message=Successfully+approved+and+reconciled+{count}+attendant+transactions+({fmt_naira(total_kobo)}+cash+collected).",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/staff/reconcile/{tx_id}")
+def reconcile_single_staff_sale_route(
+    tx_id: int,
+    auth: tuple[User, Business] = Depends(get_current_user_and_biz),
+    db: Session = Depends(get_db),
+):
+    user, biz = auth
+    from app.services import staff as staff_service
+    tx = staff_service.reconcile_single_transaction(db, biz.id, user.id, tx_id)
+    return RedirectResponse(
+        url=f"/d/staff?message=Transaction+%23{tx.id}+approved+and+reconciled+successfully.",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 

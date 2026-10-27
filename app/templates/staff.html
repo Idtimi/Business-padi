@@ -22,6 +22,146 @@
 </div>
 {% endif %}
 
+<!-- Daily Staff Audit & Stock Book Card -->
+<div class="card" style="margin-bottom: 2rem; border-left: 4px solid var(--primary);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--navy); margin-bottom: 0.25rem;">
+                Daily Staff Audit & Stock Book
+            </h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">
+                Audit today's transactions recorded by your attendants, verify cash collected, and check what inventory was sold.
+            </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span class="badge" style="background: var(--padi-mist); color: var(--navy); font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                Date: {{ daily_audit.date if daily_audit else "Today" }}
+            </span>
+            {% if daily_audit and daily_audit.pending_reconcile_count > 0 %}
+            <form action="/d/staff/reconcile-all" method="POST" style="margin: 0;">
+                <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Approve and reconcile all attendant sales for today?');">
+                    Approve All Today's Sales ({{ daily_audit.total_cash_kobo | fmt_naira }})
+                </button>
+            </form>
+            {% else %}
+            <span class="badge badge-success" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">All Approved</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div style="background: var(--padi-mist); border-radius: 8px; padding: 1rem;">
+            <div style="color: var(--text-muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase;">Total Attendant Sales</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: var(--navy); margin-top: 0.25rem;">
+                {{ (daily_audit.total_sales_kobo if daily_audit else 0) | fmt_naira }}
+            </div>
+        </div>
+        <div style="background: #FFF6EC; border-radius: 8px; padding: 1rem; border-left: 3px solid var(--primary);">
+            <div style="color: var(--padi-deep-orange); font-size: 0.8rem; font-weight: 700; text-transform: uppercase;">Cash to Collect from Attendants</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: var(--primary); margin-top: 0.25rem;">
+                {{ (daily_audit.total_cash_kobo if daily_audit else 0) | fmt_naira }}
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Physical cash/transfers to balance with staff</div>
+        </div>
+        <div style="background: var(--padi-mist); border-radius: 8px; padding: 1rem;">
+            <div style="color: var(--text-muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase;">Transactions Recorded</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: var(--navy); margin-top: 0.25rem;">
+                {{ daily_audit.total_tx_count if daily_audit else 0 }}
+            </div>
+        </div>
+        <div style="background: var(--padi-mist); border-radius: 8px; padding: 1rem;">
+            <div style="color: var(--text-muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase;">Audit Approval Status</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--navy); margin-top: 0.25rem;">
+                {% if daily_audit and daily_audit.pending_reconcile_count > 0 %}
+                <span style="color: var(--warning);">{{ daily_audit.pending_reconcile_count }} Pending Review</span>
+                {% else %}
+                <span style="color: var(--success);">Fully Reconciled</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Book (Items Sold Today) -->
+    <div style="margin-bottom: 1.5rem;">
+        <h3 style="font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 0.75rem;">
+            Stock Book (Items Sold by Attendants Today)
+        </h3>
+        {% if daily_audit and daily_audit.overall_stock and daily_audit.overall_stock|length > 0 %}
+        <div style="display: flex; flex-wrap: wrap; gap: 0.6rem;">
+            {% for item in daily_audit.overall_stock %}
+            <div style="background: white; border: 1px solid var(--border); border-radius: 6px; padding: 0.45rem 0.85rem; font-size: 0.88rem;">
+                <strong>{{ item.qty }} {{ item.unit }}</strong> {{ item.name }}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color: var(--text-muted); font-size: 0.85rem;">No items recorded sold by attendants today yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Attendant Sales Log Table -->
+    <div>
+        <h3 style="font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 0.75rem;">
+            Attendant Sales Breakdown
+        </h3>
+        {% if daily_audit and daily_audit.all_transactions and daily_audit.all_transactions|length > 0 %}
+        <div style="overflow-x: auto;">
+            <table class="table" style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                <thead>
+                    <tr style="background: var(--padi-mist); text-align: left;">
+                        <th style="padding: 0.6rem 0.75rem;">ID</th>
+                        <th style="padding: 0.6rem 0.75rem;">Time</th>
+                        <th style="padding: 0.6rem 0.75rem;">Items Sold</th>
+                        <th style="padding: 0.6rem 0.75rem;">Total Value</th>
+                        <th style="padding: 0.6rem 0.75rem;">Cash Collected</th>
+                        <th style="padding: 0.6rem 0.75rem;">Status</th>
+                        <th style="padding: 0.6rem 0.75rem; text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in daily_audit.all_transactions %}
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.6rem 0.75rem; font-weight: 600;">#{{ tx.id }}</td>
+                        <td style="padding: 0.6rem 0.75rem; color: var(--text-muted);">{{ tx.created_at[11:16] if tx.created_at and tx.created_at|length >= 16 else "--:--" }}</td>
+                        <td style="padding: 0.6rem 0.75rem;">
+                            {% if tx.items_json and tx.items_json is iterable %}
+                                {% for it in tx.items_json %}
+                                    <div>{{ it.qty }} {{ it.unit or '' }} {{ it.name }}</div>
+                                {% endfor %}
+                            {% else %}
+                                <span>Sale</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 0.6rem 0.75rem; font-weight: 700;">{{ tx.total_kobo | fmt_naira }}</td>
+                        <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--primary);">{{ tx.paid_kobo | fmt_naira }}</td>
+                        <td style="padding: 0.6rem 0.75rem;">
+                            {% if tx.reconciled_at %}
+                            <span class="badge badge-success">Approved</span>
+                            {% else %}
+                            <span class="badge badge-warning">Pending Audit</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 0.6rem 0.75rem; text-align: right;">
+                            {% if not tx.reconciled_at %}
+                            <form action="/d/staff/reconcile/{{ tx.id }}" method="POST" style="margin: 0; display: inline;">
+                                <button type="submit" class="btn btn-navy btn-sm">Approve</button>
+                            </form>
+                            {% else %}
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">Reconciled</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="color: var(--text-muted); font-size: 0.85rem;">No attendant sales to display for today.</p>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Add Staff & Generate Invite Action Forms -->
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
     <!-- Form 1: Add Staff Member Directly -->

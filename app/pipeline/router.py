@@ -208,7 +208,7 @@ def _process(session, business_id, user_id, text, message_id, lang, llm, today, 
             cust = ledger.get_or_create_customer(session, business_id, v.customer)
             tx = None
             if not v.lines and v.total_kobo <= 0:
-                tx = ledger.get_last_transaction(session, business_id)
+                tx = ledger.get_last_transaction(session, business_id, user_id=user_id)
                 if tx is None:
                     replies.append(Reply("No recent sale found to create document."))
                     continue
@@ -490,12 +490,36 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
             "TEAM & SUBSCRIPTION\n"
             "/staff - View active shop attendants\n"
             "/invite_staff - Generate a 24hr invite code for a shop attendant\n"
+            "/audit - Review and approve today's attendant sales & stock book\n"
             "/plan - Check your subscription tier (Starter, Trader, Business) or upgrade"
         )
         return [Reply(cmd_text)]
 
+    # Daily staff audit and reconciliation command (Owner only)
+    if lower in ("/audit", "audit", "/daily_audit", "daily audit", "/daily-audit", "/stockbook", "stockbook", "/end_day", "/reconcile") and biz:
+        from app.services import staff
+        if not staff.is_owner(session, business_id, user_id):
+            session.add(ProcessedMessage(channel=channel, message_id=message_id))
+            session.commit()
+            return [Reply("Access restricted: Daily staff audits are only available to the shop owner.")]
+        session.add(ProcessedMessage(channel=channel, message_id=message_id))
+        session.commit()
+        audit_data = staff.get_daily_staff_audit(session, business_id)
+        report_text = staff.format_daily_audit_text(session, audit_data, biz.name)
+        buttons = []
+        if audit_data.get("pending_reconcile_count", 0) > 0:
+            cash_fmt = fmt_naira(audit_data.get("total_cash_kobo", 0))
+            buttons.append(("audit_approve_all", f"Approve & Reconcile All ({cash_fmt})"))
+        return [Reply(report_text, buttons=buttons)]
+
     # Dashboard magic link command
     if any(lower == k or lower.startswith(k + " ") for k in ("/dashboard", "dashboard", "/login", "login")):
+        from app.services import staff
+        if biz and not staff.is_owner(session, biz.id, user_id):
+            session.add(ProcessedMessage(channel=channel, message_id=message_id))
+            session.commit()
+            return [Reply("Access restricted: Shop attendants cannot access the owner's web dashboard. Please record transactions directly in this chat.")]
+
         if biz is None:
             biz = session.scalar(select(Business).where(Business.owner_user_id == user_id))
             if biz is None:
@@ -712,7 +736,13 @@ def _saved_text(session, business_id, tx, lang) -> str:
         elif lang == "pcm":
             return f"Sale for {fmt_naira(tx.total_kobo)} don record, but e go wait make oga approve am."
         return f"Sale for {fmt_naira(tx.total_kobo)} recorded, but stays pending until the owner approves."
+
     text = t(lang, "saved")
+    biz = session.get(Business, business_id)
+    is_staff = (biz is not None and biz.owner_user_id != tx.created_by_user_id)
+    if is_staff and tx.kind == "sale":
+        cash_rec = tx.paid_kobo or tx.total_kobo
+        text += f" (Recorded for {biz.name}. Cash collected: {fmt_naira(cash_rec)})"
     if tx.customer_id and tx.kind in {"sale", "payment_received"}:
         balance = ledger.customer_balance_kobo(session, business_id, tx.customer_id)
         if balance > 0:
@@ -773,6 +803,12 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
         from app.services import staff
         tx = staff.reject_transaction(session, business_id, pending_id, user_id)
         return [Reply(f"Sale of {fmt_naira(tx.total_kobo)} rejected.")]
+    if action == "audit_approve_all":
+        from app.services import staff
+        count, total_kobo = staff.reconcile_all_daily_transactions(session, business_id, user_id)
+        return [Reply(
+            f"Daily audit approved!\n\nAll {count} attendant transactions for today (total {fmt_naira(total_kobo)} cash collected) have been verified and reconciled."
+        )]
 
     # Partner consent approval buttons
     if action == "approve_consent":
@@ -833,7 +869,7 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
             except ValueError:
                 pass
         if tx is None:
-            tx = ledger.get_last_transaction(session, business_id)
+            tx = ledger.get_last_transaction(session, business_id, user_id=user_id)
         if tx is None:
             return [Reply("No recent sale found to create receipt.")]
 
@@ -935,6 +971,28 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
                 )
 
         if doc is None:
+            tx = ledger.get_last_transaction(session, business_id, user_id=user_id)
+            if tx:
+                doc = session.scalar(
+                    select(Document).where(
+                        Document.business_id == business_id,
+                        Document.transaction_id == tx.id,
+                        Document.kind == "invoice",
+                    )
+                )
+                if doc is None:
+                    doc = documents.issue_document(
+                        session=session,
+                        business_id=business_id,
+                        kind="invoice",
+                        transaction_id=tx.id,
+                        customer_id=tx.customer_id,
+                        items=tx.items_json or [],
+                        total_kobo=tx.total_kobo,
+                        paid_kobo=tx.paid_kobo,
+                    )
+
+        if doc is None:
             doc = session.scalar(
                 select(Document).where(
                     Document.business_id == business_id,
@@ -942,20 +1000,6 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
                     Document.status == "issued",
                 ).order_by(Document.id.desc())
             )
-
-        if doc is None:
-            tx = ledger.get_last_transaction(session, business_id)
-            if tx:
-                doc = documents.issue_document(
-                    session=session,
-                    business_id=business_id,
-                    kind="invoice",
-                    transaction_id=tx.id,
-                    customer_id=tx.customer_id,
-                    items=tx.items_json or [],
-                    total_kobo=tx.total_kobo,
-                    paid_kobo=tx.paid_kobo,
-                )
 
         if doc is None:
             return [Reply(

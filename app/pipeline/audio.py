@@ -116,8 +116,8 @@ async def download_and_convert(channel, media_ref: str) -> tuple[str, Path]:
                 f"Voice note is {duration:.0f}s, max is {settings.max_voice_seconds}s"
             )
 
-        # If the input is already a WAV, return directly
-        if ext == ".wav":
+        # If the input is in a native format supported by Whisper, return directly for maximum speed
+        if ext in (".ogg", ".oga", ".opus", ".mp3", ".wav", ".m4a"):
             return str(raw_path), tmp_dir
 
         wav_path = tmp_dir / "voice.wav"

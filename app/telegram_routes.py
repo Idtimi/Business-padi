@@ -5,7 +5,7 @@ import logging
 from typing import Any
 import httpx
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.channels.base import IncomingMessage
@@ -17,6 +17,37 @@ from app.pipeline.handler import handle_incoming
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+
+_in_flight_tg_messages: set[str] = set()
+
+
+async def process_telegram_update(channel: TelegramChannel, msg: IncomingMessage, chat_id: str) -> None:
+    """Process incoming message asynchronously in background to avoid Telegram webhook timeouts."""
+    if msg.message_id in _in_flight_tg_messages:
+        await channel.aclose()
+        return
+    _in_flight_tg_messages.add(msg.message_id)
+    try:
+        if msg.kind == "voice":
+            try:
+                await channel.send_chat_action(chat_id, "record_voice")
+            except Exception:
+                pass
+        with SessionLocal() as session:
+            asr_engine = get_asr()
+            await handle_incoming(channel, msg, session, asr=asr_engine)
+    except Exception as e:
+        log.exception("Error processing Telegram message: %s", e)
+        try:
+            await channel.send_text(
+                chat_id,
+                "An error occurred while processing your request. Please try again or type /commands to see available actions.",
+            )
+        except Exception:
+            pass
+    finally:
+        _in_flight_tg_messages.discard(msg.message_id)
+        await channel.aclose()
 
 
 @router.get("/webhook/telegram")
@@ -52,7 +83,7 @@ async def get_telegram_webhook_info():
 
 
 @router.post("/webhook/telegram")
-async def receive_telegram_webhook(request: Request):
+async def receive_telegram_webhook(request: Request, background: BackgroundTasks):
     """Receive incoming webhook updates from Telegram Bot API."""
     try:
         update: dict[str, Any] = await request.json()
@@ -63,6 +94,7 @@ async def receive_telegram_webhook(request: Request):
 
     channel = TelegramChannel()
     msg: IncomingMessage | None = None
+    chat_id = ""
 
     if "callback_query" in update:
         cb = update["callback_query"]
@@ -158,21 +190,7 @@ async def receive_telegram_webhook(request: Request):
             )
 
     if msg is not None:
-        try:
-            with SessionLocal() as session:
-                asr_engine = get_asr()
-                await handle_incoming(channel, msg, session, asr=asr_engine)
-        except Exception as e:
-            log.exception("Error processing Telegram message: %s", e)
-            try:
-                await channel.send_text(
-                    chat_id,
-                    "An error occurred while processing your request. Please try again or type /commands to see available actions.",
-                )
-            except Exception:
-                pass
-        finally:
-            await channel.aclose()
+        background.add_task(process_telegram_update, channel, msg, chat_id)
     else:
         await channel.aclose()
 

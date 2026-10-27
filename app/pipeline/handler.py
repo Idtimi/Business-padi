@@ -285,6 +285,15 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
 
     # 1. Check for settings commands upfront
     if msg.kind == "text" and text.lower().startswith("/settings"):
+        from app.services import staff
+        if biz and not staff.is_owner(session, biz.id, user.id):
+            session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+            session.commit()
+            await _send_all(channel, session, biz, msg.user_ref, [
+                router.Reply("Access restricted: Only the shop owner can view or modify shop settings (name, brand color, address, bank details).")
+            ])
+            return
+
         if user.state != "DONE":
             user.state = "DONE"
             session.commit()
