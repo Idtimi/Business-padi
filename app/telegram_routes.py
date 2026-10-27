@@ -164,5 +164,12 @@ async def receive_telegram_webhook(request: Request):
                 await handle_incoming(channel, msg, session, asr=asr_engine)
         except Exception as e:
             log.exception("Error processing Telegram message: %s", e)
+            try:
+                await channel.send_text(
+                    chat_id,
+                    "An error occurred while processing your request. Please try again or type /commands to see available actions.",
+                )
+            except Exception:
+                pass
 
     return JSONResponse({"status": "ok"}, status_code=200)

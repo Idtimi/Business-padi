@@ -191,7 +191,10 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         hardcoded_names = {"Mama Ngozi Provisions", "Business Padi Store"}
         if biz and biz.name not in hardcoded_names and user.channel_user_id not in hardcoded_phones:
             from app import models as m
-            m.delete_business_cascade(session, biz.id)
+            try:
+                m.delete_business_cascade(session, biz.id)
+            except Exception as e:
+                log.warning("Cascade delete error on reset: %s", e)
             biz = None
 
         user.state = "CHOOSE_LANGUAGE"

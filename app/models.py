@@ -293,29 +293,40 @@ class WaMessageLog(Base):
 
 def delete_business_cascade(session, business_id: int) -> None:
     """Delete a business and all related records cleanly across SQLite and PostgreSQL."""
+    import logging
     from sqlalchemy import text
+    _log = logging.getLogger(__name__)
+    statements = [
+        "DELETE FROM wa_message_log WHERE business_id = :bid",
+        "DELETE FROM audit_log WHERE business_id = :bid",
+        "DELETE FROM events WHERE business_id = :bid",
+        "DELETE FROM usage_log WHERE business_id = :bid",
+        "DELETE FROM usage_counters WHERE business_id = :bid",
+        "DELETE FROM share_links WHERE consent_id IN (SELECT id FROM consents WHERE business_id = :bid)",
+        "DELETE FROM consents WHERE business_id = :bid",
+        "DELETE FROM reminders WHERE business_id = :bid",
+        "DELETE FROM invites WHERE business_id = :bid",
+        "DELETE FROM staff WHERE business_id = :bid",
+        "DELETE FROM doc_counters WHERE business_id = :bid",
+        "DELETE FROM documents WHERE business_id = :bid",
+        "DELETE FROM payments WHERE business_id = :bid",
+        "DELETE FROM stock_moves WHERE item_id IN (SELECT id FROM stock_items WHERE business_id = :bid)",
+        "DELETE FROM unit_conversions WHERE item_id IN (SELECT id FROM stock_items WHERE business_id = :bid)",
+        "DELETE FROM item_aliases WHERE item_id IN (SELECT id FROM stock_items WHERE business_id = :bid)",
+        "DELETE FROM stock_items WHERE business_id = :bid",
+        "DELETE FROM pending_actions WHERE business_id = :bid",
+        "DELETE FROM transactions WHERE business_id = :bid",
+        "DELETE FROM customers WHERE business_id = :bid",
+        "DELETE FROM businesses WHERE id = :bid",
+    ]
     try:
-        session.execute(text("DELETE FROM wa_message_log WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM audit_logs WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM events WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM usage_logs WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM usage_counters WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM share_links WHERE consent_id IN (SELECT id FROM consents WHERE business_id = :bid)"), {"bid": business_id})
-        session.execute(text("DELETE FROM consents WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM reminders WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM invites WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM staff WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM doc_counters WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM documents WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM payments WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM stock_moves WHERE item_id IN (SELECT id FROM stock_items WHERE business_id = :bid)"), {"bid": business_id})
-        session.execute(text("DELETE FROM item_aliases WHERE item_id IN (SELECT id FROM stock_items WHERE business_id = :bid)"), {"bid": business_id})
-        session.execute(text("DELETE FROM stock_items WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM pending_actions WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM transactions WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM customers WHERE business_id = :bid"), {"bid": business_id})
-        session.execute(text("DELETE FROM businesses WHERE id = :bid"), {"bid": business_id})
+        for stmt in statements:
+            try:
+                session.execute(text(stmt), {"bid": business_id})
+            except Exception as e:
+                _log.warning("Cascade delete error on '%s': %s", stmt, e)
         session.commit()
-    except Exception:
+    except Exception as e:
         session.rollback()
+        _log.exception("delete_business_cascade failed: %s", e)
         raise
