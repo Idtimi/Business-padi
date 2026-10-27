@@ -169,41 +169,43 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         await _send_all(channel, session, biz, msg.user_ref, [router.Reply("You are sending messages too quickly. Please wait a moment.")])
         return
 
-    # Check for STOP / START keywords
+    # Check for WhatsApp STOP opt-out (Twilio opt-out compliance)
     text = (msg.text or "").strip()
     t_upper = text.upper()
-    if msg.kind == "text" and t_upper in ("STOP", "START"):
+    if msg.kind == "text" and msg.channel in ("whatsapp", "twilio") and t_upper == "STOP":
         from app.services import templates
         session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
-        if t_upper == "STOP":
-            templates.opt_out_phone(session, msg.user_ref)
-            session.commit()
-            reply_text = "You have successfully opted out and will no longer receive automated messages. Reply START to opt back in."
-        else:
-            templates.opt_in_phone(session, msg.user_ref)
-            session.commit()
-            reply_text = "You have re-subscribed to messages. Text HELP to see available options."
-        await _send_all(channel, session, biz, msg.user_ref, [router.Reply(reply_text)])
-        return
-
-    # Check for staff invite join codes
-    if msg.kind == "text" and (t_upper.startswith("JOIN-") or t_upper.startswith("/JOIN ")):
-        code = t_upper.replace("/JOIN ", "JOIN-")
-        from app.services import staff
-        ok, reply_msg, st = staff.join_business_with_code(session, user.id, code)
-        if ok:
-            user.state = "DONE"
-            session.commit()
-            biz = session.get(Business, st.business_id) if st else biz
-        replies = [router.Reply(reply_msg)]
-        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        templates.opt_out_phone(session, msg.user_ref)
         session.commit()
-        await _send_all(channel, session, biz, msg.user_ref, replies)
+        reply_text = "You have successfully opted out and will no longer receive automated messages. Send a message to start again."
+        await _send_all(channel, session, biz, msg.user_ref, [router.Reply(reply_text)])
         return
 
     # Check for setup / reset / restart commands
     if msg.kind == "text" and t_upper in ("/START", "START", "/SETUP", "SETUP", "/ONBOARD", "ONBOARDING", "/RESET_SHOP", "/RESET", "RESTART", "/RESTART"):
+        hardcoded_phones = {"2348011223344", "+2348164802550", "2348164802550"}
+        hardcoded_names = {"Mama Ngozi Provisions", "Business Padi Store"}
+        if biz and biz.name not in hardcoded_names and user.channel_user_id not in hardcoded_phones:
+            from app import models as m
+            session.query(m.Payment).filter_by(business_id=biz.id).delete()
+            session.query(m.Document).filter_by(business_id=biz.id).delete()
+            session.query(m.StockMove).filter(m.StockMove.item_id.in_(
+                session.query(m.StockItem.id).filter_by(business_id=biz.id)
+            )).delete(synchronize_session=False)
+            session.query(m.StockItem).filter_by(business_id=biz.id).delete()
+            session.query(m.Transaction).filter_by(business_id=biz.id).delete()
+            session.query(m.Customer).filter_by(business_id=biz.id).delete()
+            session.query(m.Event).filter_by(business_id=biz.id).delete()
+            session.query(m.UsageLog).filter_by(business_id=biz.id).delete()
+            session.query(m.Staff).filter_by(business_id=biz.id).delete()
+            session.query(m.DocCounter).filter_by(business_id=biz.id).delete()
+            session.query(m.PendingAction).filter_by(business_id=biz.id).delete()
+            session.delete(biz)
+            biz = None
+
         user.state = "NEW"
+        user.consent_at = None
+        user.state_data = {}
         session.commit()
         replies = await onboarding.handle_onboarding(channel, msg, user, session)
         session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))

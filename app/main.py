@@ -86,6 +86,34 @@ async def lifespan(app: FastAPI):
                     if updated:
                         db.commit()
 
+            # Clean up temporary businesses created during earlier testing phases
+            hardcoded_phones = {"2348011223344", "+2348164802550", "2348164802550"}
+            hardcoded_names = {"Mama Ngozi Provisions", "Business Padi Store"}
+            test_bizs = db.query(m.Business).filter(~m.Business.name.in_(hardcoded_names)).all()
+            for tb in test_bizs:
+                owner = db.get(m.User, tb.owner_user_id) if tb.owner_user_id else None
+                if owner and owner.channel_user_id in hardcoded_phones:
+                    continue
+                db.query(m.Payment).filter_by(business_id=tb.id).delete()
+                db.query(m.Document).filter_by(business_id=tb.id).delete()
+                db.query(m.StockMove).filter(m.StockMove.item_id.in_(
+                    db.query(m.StockItem.id).filter_by(business_id=tb.id)
+                )).delete(synchronize_session=False)
+                db.query(m.StockItem).filter_by(business_id=tb.id).delete()
+                db.query(m.Transaction).filter_by(business_id=tb.id).delete()
+                db.query(m.Customer).filter_by(business_id=tb.id).delete()
+                db.query(m.Event).filter_by(business_id=tb.id).delete()
+                db.query(m.UsageLog).filter_by(business_id=tb.id).delete()
+                db.query(m.Staff).filter_by(business_id=tb.id).delete()
+                db.query(m.DocCounter).filter_by(business_id=tb.id).delete()
+                db.query(m.PendingAction).filter_by(business_id=tb.id).delete()
+                db.delete(tb)
+                if owner and owner.channel_user_id not in hardcoded_phones:
+                    owner.state = "NEW"
+                    owner.consent_at = None
+                    owner.state_data = {}
+            db.commit()
+
             # Automatically register Telegram webhook if configured
             try:
                 tg_token = getattr(settings, "telegram_bot_token", None)
