@@ -357,7 +357,6 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
     # Inventory & Stock commands: /stock, /items, /inventory
     if any(lower == k or lower.startswith(k + " ") for k in ("/stock", "stock", "/inventory", "inventory", "/items", "items", "check stock")):
         from app.models import StockItem
-        from app.services import plans
         if biz and not plans.allowed(biz, "stock_tracking"):
             return [Reply("Stock tracking is available on Trader and Business plans. Type /plan to upgrade.")]
         items = session.scalars(
@@ -421,7 +420,7 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
     # Parse and execute restock command or natural language
     restock_data = _parse_restock_text(text)
     if restock_data and (lower.startswith("/restock") or lower.startswith("restock") or "in stock" in lower or "to stock" in lower or "got " in lower):
-        from app.services import plans, stock
+        from app.services import stock
         from app.money import to_kobo
         if biz and not plans.allowed(biz, "stock_tracking"):
             return [Reply("Stock tracking is available on Trader and Business plans. Type /plan to upgrade.")]

@@ -151,9 +151,19 @@ def render_pdf_bytes(
     left_cells = []
     if logo_path and os.path.exists(logo_path):
         try:
-            left_cells.append(RLImage(logo_path, width=1.5 * inch, height=0.75 * inch))
-        except Exception:
-            pass
+            from PIL import Image as PILImage
+            with PILImage.open(logo_path) as pimg:
+                pw, ph = pimg.size
+            if pw > 0 and ph > 0:
+                max_w = 1.6 * inch
+                max_h = 0.9 * inch
+                scale = min(max_w / pw, max_h / ph)
+                logo_w = pw * scale
+                logo_h = ph * scale
+                left_cells.append(RLImage(logo_path, width=logo_w, height=logo_h))
+                left_cells.append(Spacer(1, 6))
+        except Exception as e:
+            log.warning("Could not load logo image for PDF: %s", e)
     left_cells.append(Paragraph(business_name, title_style))
     if business_address:
         left_cells.append(Paragraph(business_address, subtitle_style))
@@ -162,13 +172,14 @@ def render_pdf_bytes(
 
     right_cells = [
         Paragraph(doc_kind.upper(), doc_header_style),
+        Spacer(1, 4),
         Paragraph(f"<b>No:</b> {doc_number}", meta_style),
         Paragraph(f"<b>Date:</b> {doc_date}", meta_style),
     ]
     if due_date:
         right_cells.append(Paragraph(f"<b>Due Date:</b> {due_date}", meta_style))
 
-    header_table = Table([[left_cells, right_cells]], colWidths=[4.0 * inch, 3.2 * inch])
+    header_table = Table([[left_cells, right_cells]], colWidths=[4.2 * inch, 3.0 * inch])
     header_table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
@@ -177,26 +188,28 @@ def render_pdf_bytes(
         ("TOPPADDING", (0, 0), (-1, -1), 0),
     ]))
     story.append(header_table)
-    story.append(Spacer(1, 15))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceBefore=5, spaceAfter=15))
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceBefore=4, spaceAfter=14))
 
     # Bill To Box
     cust_str = customer_name or "Valued Customer"
     cust_rows = [
-        [Paragraph("<b>CUSTOMER / BILLED TO:</b>", label_style)],
-        [Paragraph(cust_str, val_style)],
+        [Paragraph("<b>BILLED TO:</b>", label_style)],
+        [Paragraph(f"<b>{cust_str}</b>", val_style)],
     ]
     if customer_phone:
         cust_rows.append([Paragraph(f"Phone: {customer_phone}", val_style)])
     cust_table = Table(cust_rows, colWidths=[7.2 * inch])
     cust_table.setStyle(TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F8FAFC")),
+        ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#E2E8F0")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(cust_table)
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 14))
 
     # Line Items Table
     curr_naira = NAIRA_SIGN
@@ -221,49 +234,66 @@ def render_pdf_bytes(
             Paragraph(ltotal_str, td_num_style),
         ])
 
-    items_table = Table(table_data, colWidths=[3.2 * inch, 1.2 * inch, 1.4 * inch, 1.4 * inch])
-    items_table.setStyle(TableStyle([
+    table_style_commands = [
         ("BACKGROUND", (0, 0), (-1, 0), primary_color),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CBD5E0")),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#E2E8F0")),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+    ]
+    for row_idx in range(1, len(table_data)):
+        if row_idx % 2 == 0:
+            table_style_commands.append(("BACKGROUND", (0, row_idx), (-1, row_idx), HexColor("#F8FAFC")))
+
+    items_table = Table(table_data, colWidths=[3.2 * inch, 1.2 * inch, 1.4 * inch, 1.4 * inch])
+    items_table.setStyle(TableStyle(table_style_commands))
     story.append(items_table)
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 14))
 
     # Totals Table
     tot_str = fmt_naira(total_kobo).replace("N", curr_naira)
     paid_str = fmt_naira(paid_kobo).replace("N", curr_naira)
     bal_str = fmt_naira(balance_kobo).replace("N", curr_naira)
 
+    balance_label = "<b>Balance Due:</b>"
+    balance_val = f"<b>{bal_str}</b>"
+    if balance_kobo <= 0:
+        balance_label = "<b>Status:</b>"
+        balance_val = "<b>FULLY PAID</b>"
+
     totals_data = [
         [Paragraph("<b>Total Amount:</b>", val_style), Paragraph(f"<b>{tot_str}</b>", td_num_style)],
         [Paragraph("Amount Paid:", val_style), Paragraph(paid_str, td_num_style)],
-        [Paragraph("<b>Balance Due:</b>", label_style), Paragraph(f"<b>{bal_str}</b>", td_num_style)],
+        [Paragraph(balance_label, label_style), Paragraph(balance_val, td_num_style)],
     ]
     totals_table = Table(totals_data, colWidths=[2.0 * inch, 1.4 * inch])
     totals_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F8FAFC")),
+        ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#E2E8F0")),
         ("LINEBELOW", (0, -1), (-1, -1), 1.5, primary_color),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
     ]))
 
     # Layout totals aligned to right
     align_table = Table([["", totals_table]], colWidths=[3.8 * inch, 3.4 * inch])
     story.append(align_table)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 16))
 
     if business_bank:
-        bank_p = Paragraph(f"<b>Bank Details:</b> {business_bank}", val_style)
+        bank_p = Paragraph(f"<b>Payment / Bank Details:</b><br/>{business_bank}", val_style)
         bank_table = Table([[bank_p]], colWidths=[7.2 * inch])
         bank_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F7FAFC")),
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F8FAFC")),
             ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#E2E8F0")),
             ("PADDING", (0, 0), (-1, -1), 8),
         ]))
         story.append(bank_table)
-        story.append(Spacer(1, 15))
+        story.append(Spacer(1, 14))
 
     footer_text = business_footer or "Thank you for your business! Generated by Business Padi."
     story.append(Spacer(1, 20))
