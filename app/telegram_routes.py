@@ -146,18 +146,12 @@ async def receive_telegram_webhook(request: Request):
             )
         elif "text" in m:
             raw_text = m.get("text", "").strip()
-            # Normalize /start into friendly greeting or onboard
-            if raw_text == "/start":
-                text = "hi"
-            else:
-                text = raw_text
-
             msg = IncomingMessage(
                 channel="telegram",
                 user_ref=chat_id,
                 message_id=f"tg_{msg_id}",
                 kind="text",
-                text=text,
+                text=raw_text,
                 media_ref=None,
                 button_id=None,
                 timestamp=datetime.now(timezone.utc),

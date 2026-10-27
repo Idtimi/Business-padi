@@ -289,3 +289,33 @@ class WaMessageLog(Base):
     status: Mapped[str] = mapped_column(String, default="sent")
     est_cost_kobo: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[str] = mapped_column(String, default=now_iso)
+
+
+def delete_business_cascade(session, business_id: int) -> None:
+    """Delete a business and all related records cleanly across SQLite and PostgreSQL."""
+    from sqlalchemy import text
+    try:
+        session.execute(text("DELETE FROM wa_message_log WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM audit_logs WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM events WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM usage_logs WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM usage_counters WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM share_links WHERE consent_id IN (SELECT id FROM consents WHERE business_id = :bid)"), {"bid": business_id})
+        session.execute(text("DELETE FROM consents WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM reminders WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM invites WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM staff WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM doc_counters WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM documents WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM payments WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM stock_moves WHERE item_id IN (SELECT id FROM stock_items WHERE business_id = :bid)"), {"bid": business_id})
+        session.execute(text("DELETE FROM item_aliases WHERE item_id IN (SELECT id FROM stock_items WHERE business_id = :bid)"), {"bid": business_id})
+        session.execute(text("DELETE FROM stock_items WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM pending_actions WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM transactions WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM customers WHERE business_id = :bid"), {"bid": business_id})
+        session.execute(text("DELETE FROM businesses WHERE id = :bid"), {"bid": business_id})
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise

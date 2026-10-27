@@ -181,27 +181,54 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         await _send_all(channel, session, biz, msg.user_ref, [router.Reply(reply_text)])
         return
 
-    # Check for setup / reset / restart commands
-    if msg.kind == "text" and t_upper in ("/START", "START", "/SETUP", "SETUP", "/ONBOARD", "ONBOARDING", "/RESET_SHOP", "/RESET", "RESTART", "/RESTART"):
+    # Check for account / shop deletion and reset commands
+    if msg.kind == "text" and t_upper in (
+        "/RESET", "RESET", "/RESET_SHOP", "RESET SHOP",
+        "/DELETE_ACCOUNT", "DELETE ACCOUNT", "/DELETE_SHOP", "DELETE SHOP",
+        "/DELETE"
+    ):
         hardcoded_phones = {"2348011223344", "+2348164802550", "2348164802550"}
         hardcoded_names = {"Mama Ngozi Provisions", "Business Padi Store"}
         if biz and biz.name not in hardcoded_names and user.channel_user_id not in hardcoded_phones:
             from app import models as m
-            session.query(m.Payment).filter_by(business_id=biz.id).delete()
-            session.query(m.Document).filter_by(business_id=biz.id).delete()
-            session.query(m.StockMove).filter(m.StockMove.item_id.in_(
-                session.query(m.StockItem.id).filter_by(business_id=biz.id)
-            )).delete(synchronize_session=False)
-            session.query(m.StockItem).filter_by(business_id=biz.id).delete()
-            session.query(m.Transaction).filter_by(business_id=biz.id).delete()
-            session.query(m.Customer).filter_by(business_id=biz.id).delete()
-            session.query(m.Event).filter_by(business_id=biz.id).delete()
-            session.query(m.UsageLog).filter_by(business_id=biz.id).delete()
-            session.query(m.Staff).filter_by(business_id=biz.id).delete()
-            session.query(m.DocCounter).filter_by(business_id=biz.id).delete()
-            session.query(m.PendingAction).filter_by(business_id=biz.id).delete()
-            session.delete(biz)
+            m.delete_business_cascade(session, biz.id)
             biz = None
+
+        user.state = "CHOOSE_LANGUAGE"
+        user.consent_at = None
+        user.state_data = {}
+        session.commit()
+
+        reset_reply = "Your shop and account data have been deleted. Let's set up your shop again from scratch.\n\nChoose your language:"
+        buttons = [
+            ("lang:en", "English"),
+            ("lang:pcm", "Nigerian Pidgin"),
+            ("lang:yo", "Yorùbá"),
+            ("lang:ha", "Hausa"),
+            ("lang:ig", "Ìgbò"),
+            ("lang:other", "Other language"),
+        ]
+        session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+        session.commit()
+        await _send_all(channel, session, None, msg.user_ref, [router.Reply(reset_reply, buttons=buttons, kind="confirm")])
+        return
+
+    # Check for /start or /setup
+    if msg.kind == "text" and t_upper in ("/START", "START", "/SETUP", "SETUP", "/ONBOARD", "ONBOARDING", "RESTART", "/RESTART"):
+        if user.state == "DONE" and biz is not None:
+            start_msg = (
+                f"Welcome back to {biz.name}!\n\n"
+                "You can:\n"
+                "- Record a sale or expense by voice note or text\n"
+                "- Issue a receipt with /receipt\n"
+                "- Open your web portal with /dashboard\n"
+                "- See all commands with /commands\n"
+                "- Reset your shop anytime with /reset or /delete_account"
+            )
+            session.add(ProcessedMessage(channel=msg.channel, message_id=msg.message_id))
+            session.commit()
+            await _send_all(channel, session, biz, msg.user_ref, [router.Reply(start_msg)])
+            return
 
         user.state = "NEW"
         user.consent_at = None
