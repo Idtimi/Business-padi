@@ -355,7 +355,7 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         return [Reply(rep_text)]
 
     # Inventory & Stock commands: /stock, /items, /inventory
-    if any(lower == k or lower.startswith(k + " ") for k in ("/stock", "stock", "/inventory", "inventory", "/items", "items", "check stock")):
+    if any(lower == k or lower.startswith(k + " ") for k in ("/stock", "stock", "/inventory", "inventory", "/items", "items", "check stock", "stock levels", "my stock", "stock report")):
         from app.models import StockItem
         if biz and not plans.allowed(biz, "stock_tracking"):
             return [Reply("Stock tracking is available on Trader and Business plans. Type /plan to upgrade.")]
@@ -455,11 +455,12 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         return [Reply(reply_msg)]
 
     # Help and all commands guide
-    if lower in ("/commands", "commands", "/help", "help", "/menu", "menu"):
+    if lower in ("/commands", "commands", "/help", "help", "/menu", "menu", "commands menu", "help menu", "show commands", "show menu"):
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         session.commit()
         cmd_text = (
             "BUSINESS PADI - ALL COMMANDS\n\n"
+            "Tap any quick button below, tap the Menu button beside the message bar, or speak a voice note.\n\n"
             "RECORD KEEPING (Voice & Text)\n"
             "- Voice Note: Speak naturally in English, Pidgin, Yoruba, Hausa, or Igbo.\n"
             "- Cash Sale: \"Sold 3 bags rice for 120k cash\"\n"
@@ -493,10 +494,18 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
             "/audit - Review and approve today's attendant sales & stock book\n"
             "/plan - Check your subscription tier (Starter, Trader, Business) or upgrade"
         )
-        return [Reply(cmd_text)]
+        quick_buttons = [
+            ("cmd_receipt", "Receipt"),
+            ("cmd_invoice", "Invoice"),
+            ("cmd_report", "Today's Report"),
+            ("cmd_debtors", "Debtors"),
+            ("cmd_stock", "Stock Levels"),
+            ("cmd_audit", "Daily Audit"),
+        ]
+        return [Reply(cmd_text, buttons=quick_buttons)]
 
     # Daily staff audit and reconciliation command (Owner only)
-    if lower in ("/audit", "audit", "/daily_audit", "daily audit", "/daily-audit", "/stockbook", "stockbook", "/end_day", "/reconcile") and biz:
+    if lower in ("/audit", "audit", "/daily_audit", "daily audit", "/daily-audit", "/stockbook", "stockbook", "/end_day", "/reconcile", "daily stockbook", "audit staff") and biz:
         from app.services import staff
         if not staff.is_owner(session, business_id, user_id):
             session.add(ProcessedMessage(channel=channel, message_id=message_id))
@@ -585,19 +594,19 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
             session.commit()
 
     # Direct receipt command
-    if lower in ("/receipt", "receipt", "/send_receipt", "send receipt") and biz:
+    if lower in ("/receipt", "receipt", "/send_receipt", "send receipt", "download receipt", "latest receipt", "my receipt", "get receipt") and biz:
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         session.commit()
         return handle_button(session, business_id, user_id, "get_receipt", lang=lang)
 
     # Direct invoice command
-    if lower in ("/invoice", "invoice", "/send_invoice", "send invoice", "/invoices", "invoices") and biz:
+    if lower in ("/invoice", "invoice", "/send_invoice", "send invoice", "/invoices", "invoices", "download invoice", "latest invoice", "my invoice", "get invoice") and biz:
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         session.commit()
         return handle_button(session, business_id, user_id, "get_invoice", lang=lang)
 
     # Debtors query command
-    if lower in ("/debtors", "debtors", "/debts", "debts", "/debt", "debt") and biz:
+    if lower in ("/debtors", "debtors", "/debts", "debts", "/debt", "debt", "who dey owe", "who owe me", "debtors list", "my debtors") and biz:
         from app.services import reports
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         session.commit()
@@ -605,7 +614,7 @@ def handle_text(session: Session, business_id: int, user_id: int, text: str, mes
         return [Reply(ans)]
 
     # Sales & Profit report command
-    if lower in ("/report", "report", "/summary", "summary", "/sales", "sales", "/today", "today") and biz:
+    if lower in ("/report", "report", "/summary", "summary", "/sales", "sales", "/today", "today", "today's report", "todays report", "today report", "daily report") and biz:
         from app.services import reports
         session.add(ProcessedMessage(channel=channel, message_id=message_id))
         session.commit()
@@ -809,6 +818,67 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
         return [Reply(
             f"Daily audit approved!\n\nAll {count} attendant transactions for today (total {fmt_naira(total_kobo)} cash collected) have been verified and reconciled."
         )]
+
+    # Quick tap command button actions from /commands and native menu
+    if action == "cmd_receipt":
+        return handle_button(session, business_id, user_id, "get_receipt", lang=lang)
+
+    if action == "cmd_invoice":
+        return handle_button(session, business_id, user_id, "get_invoice", lang=lang)
+
+    if action == "cmd_report":
+        from app.services import reports
+        ans = reports.run_query(session, business_id, "profit_period", {"period": "today"}, lang, today=None)
+        return [Reply(ans)]
+
+    if action == "cmd_debtors":
+        from app.services import reports
+        ans = reports.run_query(session, business_id, "top_debtor", {}, lang, today=None)
+        return [Reply(ans)]
+
+    if action == "cmd_stock":
+        from app.models import StockItem
+        biz = session.get(Business, business_id)
+        if biz and not plans.allowed(biz, "stock_tracking"):
+            return [Reply("Stock tracking is available on Trader and Business plans. Type /plan to upgrade.")]
+        items = session.scalars(
+            select(StockItem).where(StockItem.business_id == business_id).order_by(StockItem.name.asc())
+        ).all()
+        if not items:
+            return [Reply(
+                f"No items in {biz.name if biz else 'shop'}'s inventory yet.\n\n"
+                f"To add items:\n"
+                f"- /add_item <Product Name> [unit]\n"
+                f"- /restock <Product Name> <Quantity>\n"
+                f"- Or manage inventory on your web dashboard: /dashboard"
+            )]
+        lines = [f"INVENTORY - {biz.name if biz else 'Shop'}\n"]
+        for it in items:
+            unit_str = f" {it.base_unit}" if it.base_unit else ""
+            status_str = "In Stock"
+            if it.qty < 0:
+                status_str = "Negative Stock"
+            elif it.low_at is not None and it.qty <= it.low_at:
+                status_str = "Low Stock"
+            elif it.qty == 0:
+                status_str = "Out of Stock"
+            cost_str = f" (Avg cost: {fmt_naira(it.avg_cost_kobo)})" if it.avg_cost_kobo > 0 else ""
+            lines.append(f"- {it.name}: {it.qty:g}{unit_str} [{status_str}]{cost_str}")
+        lines.append("\nTo add more stock: /restock <item> <qty>\nTo register a new item: /add_item <name>")
+        return [Reply("\n".join(lines))]
+
+    if action == "cmd_audit":
+        from app.services import staff
+        biz = session.get(Business, business_id)
+        if not staff.is_owner(session, business_id, user_id):
+            return [Reply("Access restricted: Daily staff audits are only available to the shop owner.")]
+        audit_data = staff.get_daily_staff_audit(session, business_id)
+        report_text = staff.format_daily_audit_text(session, audit_data, biz.name if biz else "Shop")
+        btns = []
+        if audit_data.get("pending_reconcile_count", 0) > 0:
+            cash_fmt = fmt_naira(audit_data.get("total_cash_kobo", 0))
+            btns.append(("audit_approve_all", f"Approve & Reconcile All ({cash_fmt})"))
+        return [Reply(report_text, buttons=btns)]
 
     # Partner consent approval buttons
     if action == "approve_consent":

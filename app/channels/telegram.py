@@ -12,6 +12,21 @@ log = logging.getLogger(__name__)
 
 TELEGRAM_API_BASE = "https://api.telegram.org"
 
+DEFAULT_TELEGRAM_COMMANDS = [
+    {"command": "receipt", "description": "Download receipt for latest sale"},
+    {"command": "invoice", "description": "Download or create invoice"},
+    {"command": "debtors", "description": "View customers owing money"},
+    {"command": "stock", "description": "Check current stock inventory"},
+    {"command": "restock", "description": "Add new inventory for products"},
+    {"command": "report", "description": "Today's sales summary & profit"},
+    {"command": "audit", "description": "Daily attendant audit & reconciliation"},
+    {"command": "staff", "description": "View shop attendants"},
+    {"command": "invite_staff", "description": "Invite new attendant with code"},
+    {"command": "dashboard", "description": "Web dashboard login link"},
+    {"command": "settings", "description": "Shop profile and settings"},
+    {"command": "commands", "description": "All commands, shortcuts & help"},
+]
+
 
 class TelegramChannel:
     """Channel adapter for Telegram Bot API."""
@@ -161,6 +176,19 @@ class TelegramChannel:
         dl_resp.raise_for_status()
         content_type = "audio/ogg" if file_path.endswith((".oga", ".ogg", ".opus")) else "audio/mpeg"
         return dl_resp.content, content_type
+
+    async def setup_default_commands_and_menu(self) -> dict[str, Any]:
+        """Configure Telegram native Bot commands and set Menu button to 'commands' type."""
+        if not self.token:
+            return {"error": "telegram_bot_token not configured"}
+        cmd_url = f"{self._base_url}/setMyCommands"
+        menu_url = f"{self._base_url}/setChatMenuButton"
+        c_res = await self._client.post(cmd_url, json={"commands": DEFAULT_TELEGRAM_COMMANDS})
+        m_res = await self._client.post(menu_url, json={"menu_button": {"type": "commands"}})
+        return {
+            "setMyCommands": c_res.json(),
+            "setChatMenuButton": m_res.json(),
+        }
 
     async def aclose(self) -> None:
         if self._owns_client:

@@ -184,6 +184,11 @@ async def handle_incoming(channel: Channel, msg: IncomingMessage, session: Sessi
         await _send_all(channel, session, biz, msg.user_ref, [router.Reply(reply_text)])
         return
 
+    if msg.kind == "text" and msg.channel in ("whatsapp", "twilio") and t_upper in ("START", "UNSTOP"):
+        from app.services import templates
+        templates.opt_in_phone(session, msg.user_ref)
+        session.commit()
+
     # Check for staff invite / join code upfront (e.g. "JOIN-123456", "/start JOIN-123456", "/join JOIN-123456")
     join_code = None
     if msg.kind == "text":

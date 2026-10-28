@@ -63,44 +63,43 @@ RICE = ("I sell three bag of rice to Mama Ngozi, forty-two thousand five hundred
 
 def test_acceptance_attendant_large_sale_stays_pending_until_owner_approves(session):
     """Acceptance test:
-    An attendant records a large sale; it stays pending until the owner approves;
-    reports exclude it until then.
+    An attendant records a sale; it saves immediately so they can issue receipts,
+    and is flagged for owner end-of-day audit and reconciliation.
     """
     owner, biz = make_business(session)
     attendant, st = make_attendant(session, biz, "chika-1")
     c = ledger.get_or_create_customer(session, biz.id, "Mama Ngozi")
 
-    # Threshold is 100,000 NGN. RICE sale is 127,500 NGN.
     # Attendant sends voice/text sale note
     today = datetime.now(m.get_tz()).date()
     replies = router.handle_text(session, biz.id, attendant.id, RICE, "att-msg-1", today=today)
     assert len(replies) == 1
     assert replies[0].kind == "confirm"
 
-    # Attendant taps save
+    # Attendant taps save -> records transaction and allows receipt generation
     action, pid = router.parse_button(replies[0].buttons[0][0])
     save_replies = router.handle_button(session, biz.id, attendant.id, action, pid)
-    assert "pending until the owner approves" in save_replies[0].text
+    assert "Saved" in save_replies[0].text
 
-    # 1. Transaction must be in 'pending' status
+    # 1. Transaction is recorded and unreconciled (awaiting end-of-day audit)
     tx = session.scalar(select(m.Transaction).where(m.Transaction.business_id == biz.id))
     assert tx is not None
-    assert tx.status == "pending"
+    assert tx.reconciled_at is None
     assert tx.total_kobo == to_kobo(127_500)
 
-    # 2. Reports exclude pending transactions!
-    sales_rep = reports.sales_period(session, biz.id, period="today", today=today)
-    assert sales_rep["total_kobo"] == 0
-    assert sales_rep["count"] == 0
+    # 2. Daily audit report reflects attendant transaction
+    audit_data = staff.get_daily_staff_audit(session, biz.id, target_date_str=today.isoformat())
+    assert audit_data["pending_reconcile_count"] == 1
+    assert audit_data["total_cash_kobo"] == to_kobo(50_000)
 
-    # 3. Owner approves the transaction
-    approved_tx = staff.approve_transaction(session, biz.id, tx.id, actor_user_id=owner.id)
-    assert approved_tx.status == "confirmed"
+    # 3. Owner approves and reconciles end-of-day audit
+    count, cash = staff.reconcile_all_daily_transactions(session, biz.id, actor_user_id=owner.id)
+    assert count == 1
+    assert cash == to_kobo(50_000)
 
-    # 4. Reports now include the approved transaction!
-    sales_rep_after = reports.sales_period(session, biz.id, period="today", today=today)
-    assert sales_rep_after["total_kobo"] == to_kobo(127_500)
-    assert sales_rep_after["count"] == 1
+    # 4. Transaction is now reconciled
+    session.refresh(tx)
+    assert tx.reconciled_at is not None
 
 
 def test_staff_cannot_read_profit_without_permission(session):

@@ -115,7 +115,6 @@ def test_telegram_webhook_photo_upload(monkeypatch):
         assert u.state == "BRAND_COLOR"
 
 
-
 def test_telegram_webhook_text_sale_entry(monkeypatch):
     import uuid
     sent_messages = []
@@ -228,4 +227,33 @@ def test_telegram_webhook_photo_upload(monkeypatch):
     with SessionLocal() as db:
         u = db.query(m.User).filter_by(channel="telegram", channel_user_id=chat_id).first()
         assert u.state == "BRAND_COLOR"
+
+
+def test_telegram_menu_commands_configuration():
+    from app.channels.telegram import DEFAULT_TELEGRAM_COMMANDS
+    assert len(DEFAULT_TELEGRAM_COMMANDS) >= 10
+    cmd_names = [c["command"] for c in DEFAULT_TELEGRAM_COMMANDS]
+    for required in ("receipt", "invoice", "debtors", "stock", "report", "audit", "commands"):
+        assert required in cmd_names
+
+
+def test_telegram_setup_menu_endpoint(monkeypatch):
+    import httpx
+    client = TestClient(app)
+
+    async def mock_post(self, url, *args, **kwargs):
+        return httpx.Response(200, json={"ok": True, "result": True})
+
+    async def mock_get(self, url, *args, **kwargs):
+        return httpx.Response(200, json={"ok": True, "result": [{"command": "receipt", "description": "Download receipt"}]})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
+
+    res = client.get("/telegram/setup_menu")
+    assert res.status_code == 200
+    data = res.json()
+    assert data.get("set_commands", {}).get("ok") is True
+    assert data.get("set_menu_button", {}).get("ok") is True
+
 

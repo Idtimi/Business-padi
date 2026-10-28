@@ -104,18 +104,31 @@ async def lifespan(app: FastAPI):
                     if updated:
                         db.commit()
 
-            # Automatically register Telegram webhook if configured
+            # Automatically register Telegram webhook and menu button if configured
             try:
                 tg_token = getattr(settings, "telegram_bot_token", None)
-                if tg_token and settings.base_url:
+                if tg_token:
                     import httpx
-                    target_url = f"{settings.base_url.rstrip('/')}/webhook/telegram"
-                    reg_url = f"https://api.telegram.org/bot{tg_token}/setWebhook?url={target_url}"
                     with httpx.Client(timeout=10.0) as client:
-                        reg_res = client.get(reg_url)
-                        log.info("Telegram setWebhook (%s): %s", target_url, reg_res.text)
+                        if settings.base_url:
+                            target_url = f"{settings.base_url.rstrip('/')}/webhook/telegram"
+                            reg_url = f"https://api.telegram.org/bot{tg_token}/setWebhook?url={target_url}"
+                            reg_res = client.get(reg_url)
+                            log.info("Telegram setWebhook (%s): %s", target_url, reg_res.text)
+
+                        # Ensure native Menu button and Bot commands are active
+                        from app.channels.telegram import DEFAULT_TELEGRAM_COMMANDS
+                        client.post(
+                            f"https://api.telegram.org/bot{tg_token}/setMyCommands",
+                            json={"commands": DEFAULT_TELEGRAM_COMMANDS},
+                        )
+                        client.post(
+                            f"https://api.telegram.org/bot{tg_token}/setChatMenuButton",
+                            json={"menu_button": {"type": "commands"}},
+                        )
+                        log.info("Telegram native Menu button and commands configured successfully")
             except Exception as e:
-                log.warning("Could not auto-register Telegram webhook: %s", e)
+                log.warning("Could not auto-register Telegram webhook / menu: %s", e)
         except Exception as e:
             log.exception("Automatic schema / demo initialization error: %s", str(e))
     yield

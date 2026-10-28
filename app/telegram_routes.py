@@ -82,6 +82,31 @@ async def get_telegram_webhook_info():
         return res.json()
 
 
+@router.get("/telegram/setup_menu")
+@router.post("/telegram/setup_menu")
+async def setup_telegram_menu():
+    """Register or verify Telegram Bot Commands and native Menu button."""
+    token = getattr(settings, "telegram_bot_token", "")
+    if not token:
+        return {"error": "telegram_bot_token not configured"}
+    from app.channels.telegram import DEFAULT_TELEGRAM_COMMANDS
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        cmd_res = await client.post(
+            f"https://api.telegram.org/bot{token}/setMyCommands",
+            json={"commands": DEFAULT_TELEGRAM_COMMANDS},
+        )
+        menu_res = await client.post(
+            f"https://api.telegram.org/bot{token}/setChatMenuButton",
+            json={"menu_button": {"type": "commands"}},
+        )
+        info_res = await client.get(f"https://api.telegram.org/bot{token}/getMyCommands")
+        return {
+            "set_commands": cmd_res.json(),
+            "set_menu_button": menu_res.json(),
+            "active_commands": info_res.json(),
+        }
+
+
 @router.post("/webhook/telegram")
 async def receive_telegram_webhook(request: Request, background: BackgroundTasks):
     """Receive incoming webhook updates from Telegram Bot API."""
