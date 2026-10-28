@@ -904,6 +904,12 @@ def handle_button(session: Session, business_id: int, user_id: int, action: str,
             return [Reply(f"Consent request for {partner} declined.")]
         return [Reply("Consent request not found or already processed.")]
     # Billing & Plan button actions
+    if action == "upgrade_solo":
+        billing.activate_plan(session, business_id, "solo")
+        msg = ("Your account has been upgraded to the Solo Trader plan (₦2,500/month)!"
+               if lang != "pcm" else "Your account don upgrade to Solo Trader plan (₦2,500/month)!")
+        return [Reply(msg)]
+
     if action == "upgrade_trader":
         billing.activate_plan(session, business_id, "trader")
         msg = ("Your account has been upgraded to the Trader plan (₦5,000/month)!"

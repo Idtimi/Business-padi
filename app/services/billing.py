@@ -159,7 +159,12 @@ def format_plan_status_message(status: dict, lang: str = "en") -> tuple[str, lis
 
         buttons = []
         if status["plan_key"] == "starter":
+            buttons.append(("upgrade_solo", "Solo Plan (N2,500)"))
+            buttons.append(("upgrade_trader", "Trader Plan (N5,000)"))
+            buttons.append(("buy_pack", "Buy 25 Entries"))
+        elif status["plan_key"] == "solo":
             buttons.append(("upgrade_trader", "Upgrade to Trader"))
+            buttons.append(("upgrade_business", "Upgrade Business"))
             buttons.append(("buy_pack", "Buy 25 Entries"))
         elif status["plan_key"] == "trader":
             buttons.append(("upgrade_business", "Upgrade Business"))
@@ -176,7 +181,12 @@ def format_plan_status_message(status: dict, lang: str = "en") -> tuple[str, lis
 
         buttons = []
         if status["plan_key"] == "starter":
+            buttons.append(("upgrade_solo", "Solo Plan (N2,500)"))
+            buttons.append(("upgrade_trader", "Trader Plan (N5,000)"))
+            buttons.append(("buy_pack", "Buy 25 Entries"))
+        elif status["plan_key"] == "solo":
             buttons.append(("upgrade_trader", "Upgrade to Trader"))
+            buttons.append(("upgrade_business", "Upgrade Business"))
             buttons.append(("buy_pack", "Buy 25 Entries"))
         elif status["plan_key"] == "trader":
             buttons.append(("upgrade_business", "Upgrade Business"))
