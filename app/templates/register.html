@@ -28,6 +28,15 @@
             padding: 0;
         }
 
+        html, body {
+            overflow-x: hidden;
+            width: 100%;
+            max-width: 100vw;
+            margin: 0;
+            padding: 0;
+            -webkit-text-size-adjust: 100%;
+        }
+
         body {
             font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--padi-mist);
@@ -37,6 +46,20 @@
             justify-content: center;
             min-height: 100vh;
             padding: 2.5rem 1rem;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 1rem 0.75rem !important;
+            }
+            .register-card {
+                padding: 1.5rem 1rem !important;
+                border-radius: 12px !important;
+                max-width: 100% !important;
+            }
+            .brand-title {
+                font-size: 1.45rem !important;
+            }
         }
 
         .register-card {

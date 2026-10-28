@@ -14,7 +14,7 @@
         <h1 style="font-size: 1.5rem; font-weight: 700;">Stock & Inventory</h1>
         <p style="color: var(--text-muted); font-size: 0.9rem;">Track stock balances, unit costs, and reorder alerts.</p>
     </div>
-    <div style="display: flex; gap: 0.75rem;">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
         <button onclick="toggleForm('restockForm')" class="btn btn-primary" style="padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer;">
             + Restock Item
         </button>
@@ -30,7 +30,7 @@
         <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--navy);">Restock Inventory</h3>
         <button type="button" onclick="toggleForm('restockForm')" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">&times;</button>
     </div>
-    <form action="/d/stock/restock" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: flex-end;">
+    <form action="/d/stock/restock" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 1rem; align-items: flex-end;">
         <div>
             <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Product Name *</label>
             <input type="text" name="item_name" id="restock_item_name" required placeholder="e.g. Rice, Indomie, Cement" list="existing_items" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
@@ -74,7 +74,7 @@
         <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--navy);">Register New Product to Catalog</h3>
         <button type="button" onclick="toggleForm('newItemForm')" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">&times;</button>
     </div>
-    <form action="/d/stock/add_item" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: flex-end;">
+    <form action="/d/stock/add_item" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 1rem; align-items: flex-end;">
         <div>
             <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Product Name *</label>
             <input type="text" name="item_name" required placeholder="e.g. Milo, Sugar, Vegetable Oil" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">

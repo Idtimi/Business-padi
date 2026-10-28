@@ -35,7 +35,7 @@
             </div>
         </div>
 
-        <div style="min-width: 260px;">
+        <div style="min-width: 0; width: 100%; max-width: 320px;">
             <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.4rem;">
                 <span style="font-weight: 600;">Voice Entries Quota:</span>
                 <span><strong>{{ billing_status.voice_used }}</strong> / {{ billing_status.total_cap }}</span>
@@ -56,7 +56,7 @@
 
 <!-- Pricing Matrix Cards -->
 <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">Available Plans</h2>
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;">
     
     <!-- STARTER TIER -->
     <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; position: relative; {% if billing_status.plan_key == 'starter' %}border: 2px solid var(--primary); background: #fdfdfd;{% endif %}">
@@ -201,7 +201,7 @@
         </div>
         
         <form method="post" action="/d/billing/buy-pack">
-            <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
+            <button type="submit" class="btn btn-primary" style="white-space: normal;">
                 + Buy 25 Voice Entries (₦2,500)
             </button>
         </form>
